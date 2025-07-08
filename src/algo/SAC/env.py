@@ -2,11 +2,8 @@ import warnings
 
 from metadrive.envs import MetaDriveEnv
 from metadrive.policy.idm_policy import IDMPolicy
-from metadrive.policy.rL_planning_policy import RLPlanningPolicy
-from metadrive.policy.safety_improvement_policy_nonlinear import SafetyImprovementPolicy
-from metadrive.policy.safety_improvement_policy_linear import SafetyImprovementPolicyLinear
-from metadrive.policy.Rolling_horizon_optimization_linear import RHOLinear
-from metadrive.envs import StraightConfTraffic, MetaDriveEnv, MultiScenario
+from head.policy.rL_planning_policy import RLPlanningPolicy
+from head.envs import StraightConfTraffic, MultiScenario
 import time
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -29,8 +26,7 @@ def create_env(cfg, seed):
                                    discrete_action=False,
                                    horizon=400,
                                    use_render=False,
-                                   # agent_policy=RHOLinear,
-                                   # agent_policy=IDMPolicy,
+                                   agent_policy=RLPlanningPolicy,
                                    # scenario setting
                                    traffic_mode="respawn",
                                    random_spawn_lane_index=False,
@@ -74,11 +70,8 @@ def create_metadrive_env(cfg, seed):
         traffic_density=0.15
     )
 
-    # 根据baselines_flag添加特定配置
-    if not cfg.args.training.baselines_flag:
-        common_config["agent_policy"] = RHOLinear
 
-    env = MultiScenario(common_config)
+    env = MetaDriveEnv(common_config)
     # env.seed(seed)  # 注释掉的种子设置
     return env
 

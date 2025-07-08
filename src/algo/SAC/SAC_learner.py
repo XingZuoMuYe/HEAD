@@ -58,26 +58,19 @@ def generate_paths(args) -> dict:
     if map_name == 'straight_road' and not args.use_pedestrian:
         map_name = 'straight_road_no_pedestrian'
 
-    if args.training["flow_scenarios"]:
-        print("\033[1;33m[INFO]\033[0m Flow Scenario: \033[1;32m{}\033[0m".format(map_name))
-    elif args.training["random_scenarios"]:
-        print("\033[1;33m[INFO]\033[0m Random Scenario: \033[1;32m{}\033[0m".format(args.training["random_env_list"]))
-    else:
-        print(
-        "\033[1;33m[INFO]\033[0m Task Name: \033[1;32m{}\033[0m, Map Name: \033[1;34m{}\033[0m".format(task, map_name))
+
+    print("\033[1;33m[INFO]\033[0m Task Name: \033[1;32m{}\033[0m, Map Name: \033[1;34m{}\033[0m".format(task, map_name))
 
     # 动态生成路径
-    base = "Baselines_models" if args.training["baselines_flag"] else ""
+    base = ""
 
     base_result_path = root_path / "logs" / base / "SAC_model" / task / map_name
     model_save_path = root_path / "models" / base / "SAC_model" / "checkpoints" / task / map_name
-    random_scenario_path = root_path / "models" / base / "SAC_model" / "checkpoints" / "random_scenarios"
-    check_point_path = root_path / "models" / base / "SAC_model" / "checkpoints" / "flow_scenarios"
     log_save_path = root_path / "logs" / base / "SAC_model" / task / map_name
     eval_save_path = root_path / "results" / base / "SAC_model" / task / map_name
 
     # 创建目录（如果不存在）
-    for path in [base_result_path, model_save_path, log_save_path, eval_save_path, check_point_path, random_scenario_path]:
+    for path in [base_result_path, model_save_path, log_save_path, eval_save_path]:
         path.mkdir(parents=True, exist_ok=True)
 
     return {
@@ -85,8 +78,6 @@ def generate_paths(args) -> dict:
         "model_save_path": str(model_save_path),
         "log_save_path": str(log_save_path),
         "eval_save_path": str(eval_save_path),
-        "flow_scenarios": str(check_point_path),
-        "random_scenarios": str(random_scenario_path)
     }
 
 
@@ -137,15 +128,6 @@ class SACConfig:
         self.model_save_path = path_dict["model_save_path"]
         self.log_save_path = path_dict["log_save_path"]
         self.eval_save_path = path_dict["eval_save_path"]
-        self.random_scenario_model_path = path_dict["random_scenarios"]
-        if args.training["flow_scenarios"]:
-            self.check_point_path = path_dict["flow_scenarios"]
-            print('checkpoint name: ', args.training["checkpoint_name"])
-        elif args.training["random_scenarios"]:
-            self.model_save_path = path_dict["random_scenarios"]
-        else:
-            args.training["checkpoint_name"] = 'Null'
-            print('No checkpoint is loaded.')
         self.train_eps = 1000000
         self.eps_max_steps = 2000
         self.eval_eps = 100000
@@ -185,43 +167,13 @@ class SAC_Learner:
         self.model_path = self.model_save_path + '/' + self.SAC_cfg.train_name + '/'
         self.log_path = self.SAC_cfg.log_save_path + '/' + self.SAC_cfg.train_name + '/'
         self.eval_path = self.SAC_cfg.eval_save_path + '/' + self.SAC_cfg.train_name + '/'
-        if self.SAC_cfg.args.training.flow_scenarios:
-            self.check_point_path = self.SAC_cfg.check_point_path + '/' + self.SAC_cfg.args.training.checkpoint_name + '/'
 
         self.fps = 0.0
 
         if self.SAC_cfg.train_flag:
-            if self.SAC_cfg.args.training.flow_scenarios:
-                self.model_path, _ = get_dir_path(self.check_point_path)
-                make_dir(self.model_path)
-                training_info = {
-                    "recent_checkpoint": self.SAC_cfg.args.training.checkpoint_name,
-                    "map_name": self.SAC_cfg.args.map_name,
-                    'task_name': self.SAC_cfg.args.task.split('-')[0],
-                    "status": "loaded"  # 或者其他状态信息
-                }
 
-                # 打开文件并写入信息
-                with open(self.model_path + "training_log.txt", "w") as file:
-                    file.write("===== Training Information =====\n")
-                    for key, value in training_info.items():
-                        file.write(f"{key}: {value}\n")
-                    file.write("=" * 30 + "\n")
-            elif self.SAC_cfg.args.training.random_scenarios:
-                self.model_path, _ = get_dir_path(self.model_path)
-                make_dir(self.model_path)
-                training_info = {
-                    "random_env_list": self.SAC_cfg.args.training.random_env_list,
-                }
-                # 打开文件并写入信息
-                with open(self.model_path + "training_log.txt", "w") as file:
-                    file.write("===== Training Information =====\n")
-                    for key, value in training_info.items():
-                        file.write(f"{key}: {value}\n")
-                    file.write("=" * 30 + "\n")
-            else:
-                self.model_path, _ = get_dir_path(self.model_path)
-                make_dir(self.model_path)
+            self.model_path, _ = get_dir_path(self.model_path)
+            make_dir(self.model_path)
 
             # 定义训练信息
             self.L = Logger(self.SAC_cfg.base_result_path, self.SAC_cfg.args)
@@ -255,20 +207,11 @@ class SAC_Learner:
         self.agent = SAC(state_dim, action_dim, self.SAC_cfg)
         print(self.SAC_cfg.algo + ' algorithm is starting')
 
-        if self.SAC_cfg.args.training.flow_scenarios:
-            self.load_checkpoint()
 
     def generate_env(self):
-        if self.SAC_cfg.args.training.random_scenarios:
-            self.env.close()
-            env_name = random.choice(self.SAC_cfg.args.training.random_env_list)
-            # 打印环境信息
-            print(f'env is random: {env_name}')
-            self.update_config(env_name)
-            self.env = make_env_sac(self.SAC_cfg)
-        else:
-            self.env.close()
-            self.env = make_env_sac(self.SAC_cfg)
+        self.env.close()
+        self.env = make_env_sac(self.SAC_cfg)
+
 
     def update_config(self, env_name):
 
@@ -282,12 +225,6 @@ class SAC_Learner:
             self.SAC_cfg.args.task = 'muti_scenario-v0'
             self.SAC_cfg.args.map_name = env_name
 
-    def load_checkpoint(self):
-
-        self.agent.load(self.check_point_path + [item for item in os.listdir(self.check_point_path) if 'stage_' in item][0])
-        print('checkpoint_path: ' + self.check_point_path)
-        print('checkpoint: ' + self.SAC_cfg.args.training.checkpoint_name + ' is loaded')
-
     def load(self):
         newest_model_path = self.model_path + os.listdir(self.model_path)[0]
         self.agent.load(newest_model_path)
@@ -295,16 +232,23 @@ class SAC_Learner:
 
     def render(self):
         if self.SAC_cfg.args.task == 'straight_config_traffic-v0':
+            # self.env.render(mode="topdown",
+            #                 screen_record=False,
+            #                 scaling=6,
+            #                 film_size=(6000, 400),
+            #                 show_plan_traj=True,
+            #                 )
             self.env.render(mode="topdown",
                             screen_record=False,
-                            scaling=6,
-                            film_size=(6000, 400),
-                            show_plan_traj=True,
+                            film_size=(90000, 6000),
                             )
         elif self.SAC_cfg.args.task == 'muti_scenario-v0' or self.SAC_cfg.args.task == 'single_scenario-v0':
+            # self.env.render(mode="topdown",
+            #                 screen_record=False,
+            #                 show_plan_traj=True,
+            #                 )
             self.env.render(mode="topdown",
                             screen_record=False,
-                            show_plan_traj=True,
                             )
 
     def train(self):

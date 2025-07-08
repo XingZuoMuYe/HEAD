@@ -51,11 +51,18 @@ class VideoRecorder:
             return
 
         # Common render parameters
+        # render_params = {
+        #     "mode": "topdown",
+        #     "screen_record": False,
+        #     "window": False,
+        #     "show_plan_traj": True
+        # }
+
         render_params = {
             "mode": "topdown",
             "screen_record": False,
             "window": False,
-            "show_plan_traj": True
+            # "show_plan_traj": True
         }
 
         # Specific task configurations

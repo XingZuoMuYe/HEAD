@@ -1,18 +1,8 @@
-import sys
-import os
-import platform
 
-if platform.system() == 'Linux' and 'Ubuntu' in platform.version():
-    sys.path.append('/home/test/git_shuo/SPI/')
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
-from stable_baselines3.common.monitor import Monitor
-from metadrive.envs import MetaDriveEnv
 from src.algo.SAC.cfg import parse_cfg
 import argparse
 from src.algo.SAC.SAC_learner import SAC_Learner, SACConfig
 from pathlib import Path
-from src.algo.SAC.env import make_env
 
 __CONFIG__, __LOGS__ = 'config', 'logs'
 
@@ -51,7 +41,6 @@ if __name__ == '__main__':
     cfg = SACConfig(merge_two_dicts(conf, args))
 
     if bool(cfg.train_flag):
-
         SAC = SAC_Learner(cfg)
         SAC.agent_initialize()
         SAC.train()
