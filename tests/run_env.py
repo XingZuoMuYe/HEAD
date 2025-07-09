@@ -1,15 +1,16 @@
 import time
 import matplotlib.pyplot as plt
 from metadrive import MetaDriveEnv
-from metadrive.policy.idm_policy import IDMPolicy
 from metadrive.utils.draw_top_down_map import draw_top_down_map
 from stable_baselines3.common.monitor import Monitor
 from head.envs.config_traffic_metadrive_env import StraightConfTraffic
 from head.engine.head_renderer import HeadTopDownRenderer
-from head.policy.rL_planning_policy import RLPlanningPolicy
-
+from head.policy.evolvable_policy.rL_planning_policy import RLPlanningPolicy
+from metadrive.component.map.base_map import BaseMap
+from metadrive.component.map.pg_map import parse_map_config, MapGenerateMethod
+from metadrive.component.algorithm.blocks_prob_dist import PGBlockDistConfig
 def create_env(need_monitor=False):
-    env = StraightConfTraffic(dict(map="SSSSSSSSSSSSSSSS",
+    env = StraightConfTraffic(dict(
                                    # This policy setting simplifies the task
                                    discrete_action=False,
                                    horizon=400,
@@ -28,7 +29,13 @@ def create_env(need_monitor=False):
                                    out_of_road_penalty=30.0,
                                    scenario_difficulty=0,
                                    use_pedestrian=True,
-                                   lane_num=4,
+                                   map_config={
+                                       "type": 'block_sequence',
+                                       "exit_length": 50,
+                                       'lane_num': 4,
+                                       'config': 'SSSSSSSSSSSSSSSS',
+                                       "start_position": [0, 0],
+                                   },
                                    ))
     if need_monitor:
         env = Monitor(env)
@@ -41,7 +48,7 @@ def create_multi_scenario_env(need_monitor=False):
     创建并返回一个多场景环境，支持渲染和监控。
     """
     env = MetaDriveEnv(dict(
-        map="SOCSX",  # 选择的地图
+        # map=3,
         discrete_action=False,  # 使用连续动作空间
         horizon=2800,  # 设定最大时间步数
         use_render=False,  # 是否渲染环境
@@ -55,13 +62,19 @@ def create_multi_scenario_env(need_monitor=False):
         crash_vehicle_penalty=30.0,  # 撞车惩罚
         crash_object_penalty=30.0,  # 撞物惩罚
         out_of_road_penalty=30.0,  # 离开道路惩罚
-        traffic_density=0.15  # 交通密度
+        traffic_density=0.15 , # 交通密度
+        map_config={
+            "type":'block_sequence',
+            "exit_length": 50,
+            'lane_num': 3,
+            'config': 'CCO',
+            "start_position": [0, 0],
+        },
     ))
 
     # 如果需要监控，添加 Monitor
     if need_monitor:
         env = Monitor(env)
-
     return env
 
 
@@ -70,10 +83,10 @@ if __name__ == "__main__":
     total_reward = 0
 
     # multi_scenario_env
-    env = create_multi_scenario_env(need_monitor=False)  # 创建环境
+    # env = create_multi_scenario_env(need_monitor=False)  # 创建环境
 
     # straight_env
-    # env = create_env()
+    env = create_env()
 
     env.reset()
     env.head_renderer = HeadTopDownRenderer(env)
@@ -104,18 +117,18 @@ if __name__ == "__main__":
             total_reward += reward  # 累加奖励
 
             # multi_scenario_env
-            env.head_renderer.render(
-                screen_record=False,
-                show_plan_traj=True,
-                mode="topdown")
-
-            # straight_env
             # env.head_renderer.render(
             #     screen_record=False,
-            #     scaling=6,
-            #     film_size=(6000, 400),
             #     show_plan_traj=True,
             #     mode="topdown")
+
+            # straight_env
+            env.head_renderer.render(
+                screen_record=False,
+                scaling=6,
+                film_size=(6000, 400),
+                show_plan_traj=True,
+                mode="topdown")
 
             t2 = time.time()
             # 打印每一步的时间消耗（可选）

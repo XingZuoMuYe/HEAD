@@ -258,7 +258,7 @@ class ConTrafficManager(BaseManager):
             grid_choices = np.arange(20, 40, 8)
 
         LIMIT_SPEED = 40.0
-        if self.global_config['lane_num'] == 3:
+        if self.engine.global_config.map_config['lane_num'] == 3:
             grid_choices = np.arange(20, 40, 8)
             SPEED_DIFFERENCE = [15.0, 10.0, 18.75]
             long = self.VEHICLE_GAP * grid_choices / 3
@@ -267,14 +267,14 @@ class ConTrafficManager(BaseManager):
             long = self.VEHICLE_GAP * grid_choices / 4
 
         for long in long.tolist():
-            lane = self.respawn_lanes[np.random.choice(self.global_config['lane_num'])]
+            lane = self.respawn_lanes[np.random.choice(self.engine.global_config.map_config['lane_num'])]
             vehicle_type = self.random_vehicle_type()
             traffic_v_config = {"spawn_lane_index": lane.index, "spawn_longitude": long, "spawn_lateral": 0}
 
             # print(lane.index)
             traffic_v_config.update(self.engine.global_config["traffic_vehicle_config"])
             random_v = self.spawn_object(vehicle_type, vehicle_config=traffic_v_config)
-            from head.policy.idm_policy_include_pedestrian import IDMPolicyIncluedPedestrain
+            from head.policy.basic_policy.idm_policy_include_pedestrian import IDMPolicyIncluedPedestrain
             difference = float(np.random.choice(SPEED_DIFFERENCE, 1))
             # print(difference)
             IDMPolicyIncluedPedestrain.NORMAL_SPEED = LIMIT_SPEED*difference/100

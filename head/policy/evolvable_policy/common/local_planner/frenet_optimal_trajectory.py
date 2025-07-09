@@ -15,9 +15,9 @@ Ref:
 import numpy as np
 import copy
 import math
-from head.policy.common.local_planner import cubic_spline_planner
-from head.policy.common.config import cfg
-from head.policy.common.utils import calc_cur_s, calc_cur_fpath_s, EGO_POSE
+from head.policy.evolvable_policy.common.local_planner import cubic_spline_planner
+from head.policy.evolvable_policy.common.config import cfg
+from head.policy.evolvable_policy.common.utils import calc_cur_s, EGO_POSE
 
 
 def euclidean_distance(v1, v2):

@@ -44,7 +44,6 @@ CONF_TRAFFIC_DEFAULT_CONFIG = dict(
         spawn_lateral=3.5),
     scenario_difficulty=1,
     use_pedestrian=False,
-    lane_num=4,
     comfort_reward=1.0
 )
 
@@ -60,10 +59,6 @@ class StraightConfTraffic(MetaDriveEnv):
 
         return config
 
-    def _post_process_config(self, config):
-        config = super(StraightConfTraffic, self)._post_process_config(config)
-        config["map_config"][BaseMap.LANE_NUM] = config['lane_num']  # 确保车道数设置为3
-        return config
 
     def __init__(self, config=None):
         super(StraightConfTraffic, self).__init__(config)

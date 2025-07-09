@@ -13,7 +13,8 @@ class Pedestrian_Manager(BaseManager):
         super(Pedestrian_Manager, self).__init__()
         self.generated_p = []
         self.recycle_ts = 1000
-        if self.engine.global_config['lane_num'] == 3:
+
+        if self.engine.global_config.map_config['lane_num'] == 3:
             self.pedestrian_num = 2
         else:
             self.pedestrian_num = 5
@@ -23,7 +24,7 @@ class Pedestrian_Manager(BaseManager):
     def before_step(self):
         self.generate_ts = np.random.choice(np.arange(0, 5), self.pedestrian_num, replace=False)  # 0到5s随机
 
-        if self.engine.global_config['lane_num'] == 3:
+        if self.engine.global_config.map_config['lane_num'] == 3:
             pos_x = [60, 80]
             speed_y = [0.8, 1.4]
         else:

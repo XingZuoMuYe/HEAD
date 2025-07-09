@@ -5,17 +5,13 @@ from metadrive.engine.logger import get_logger
 from metadrive.component.vehicle.PID_controller import PIDController
 from metadrive.engine.engine_utils import get_global_config
 from metadrive.policy.env_input_policy import EnvInputPolicy
-from metadrive.utils.math import wrap_to_pi
-from head.policy.common.utils import smooth_curve, convert_to_debug_plot, plot_vis
-import matplotlib.pyplot as plt
-from head.policy.common.config import cfg, log_config_to_file, cfg_from_list, cfg_from_yaml_file
-from head.policy.common.local_planner.frenet_optimal_trajectory import FrenetPlanner as MotionPlanner
-from head.policy.common.utils import EGO_POSE, calc_cur_s, calc_cur_d, closest_wp_idx, preview_point, match_point, \
+from head.policy.evolvable_policy.common.utils import smooth_curve
+from head.policy.evolvable_policy.common.config import cfg, cfg_from_yaml_file
+from head.policy.evolvable_policy.common.local_planner.frenet_optimal_trajectory import FrenetPlanner as MotionPlanner
+from head.policy.evolvable_policy.common.utils import EGO_POSE, calc_cur_s, calc_cur_d, preview_point, match_point, \
     calculate_laterror
 import math
 import os
-import threading
-import time
 
 logger = get_logger()
 
@@ -34,12 +30,11 @@ class RLPlanningPolicy(EnvInputPolicy):
         current_path = os.path.realpath(__file__)
         root_path = os.path.dirname(os.path.dirname(current_path))
         self.global_csp = None
-        self.cfg = cfg_from_yaml_file(root_path + '/policy/common/cfgs/config.yaml', cfg)
+        self.cfg = cfg_from_yaml_file(root_path + '/evolvable_policy/common/cfgs/config.yaml', cfg)
         self.max_s = int(self.cfg.FRENET.MAX_S)
         self.motionPlanner = MotionPlanner(self.cfg)
         self.ego_pose = None
         self.get_ego_info()
-
         self.count = 0
         self.f_idx = 0
         self.vehicleController = None
@@ -74,8 +69,9 @@ class RLPlanningPolicy(EnvInputPolicy):
         checkpoints = self.control_object.navigation.checkpoints
         global_center_points = np.empty((0, 2))
         for i in range(len(checkpoints) - 1):
-            lane_seg = road_network.graph[checkpoints[i]][checkpoints[i + 1]][1]
-            lane_seg_center_points = lane_seg.get_polyline()
+            lane_seg = road_network.graph[checkpoints[i]][checkpoints[i + 1]]
+            target_lane_seg = lane_seg[1] if len(lane_seg) > 1 else lane_seg[0]
+            lane_seg_center_points = target_lane_seg.get_polyline()
             if i != 0:
                 global_center_points = np.vstack([global_center_points, lane_seg_center_points[1:]])
             else:
@@ -90,14 +86,22 @@ class RLPlanningPolicy(EnvInputPolicy):
         ego_state = [self.ego_pose.x, self.ego_pose.y, self.ego_pose.speed, self.ego_pose.acc, self.ego_pose.yaw, temp,
                      self.max_s]
         ego_fstate, f_idx = self.motionPlanner.estimate_frenet_state_new(ego_state, self.f_idx)
-        # lon_ter = 0.0
-        # Tf = 1.0
-        # lon_ter = 1.0
 
-        df_n = lat_ter * 5.25 - 1.75
-        # df_n = 0.0
+        lane_num = self.engine.global_config.map_config['lane_num']
+        lane_width = self.engine.global_config.map_config['lane_width']
+
+        assert -1.0 <= lat_ter <= 1.0, "lat_ter 应该在 [-1, 1] 范围内"
+        assert lane_num >= 1
+        top_center = lane_width * (lane_num > 1)
+        bottom_center = top_center - (lane_num - 1) * lane_width
+        t = (1 - lat_ter) / 2
+        df_n = (1 - t) * top_center + t * bottom_center
+
+        # 纵向目标速度
         Vf_n = (lon_ter + 1) * 5.0
+        # 时间目标
         Tf_n = 0.5 * Tf + 3.0
+
         fpath_rl = self.motionPlanner.run_step_single_path(ego_fstate, self.f_idx,
                                                            df_n=df_n, Tf=Tf_n,
                                                            Vf_n=Vf_n)
