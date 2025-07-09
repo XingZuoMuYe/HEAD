@@ -1,14 +1,15 @@
 import warnings
-
 from metadrive.envs import MetaDriveEnv
 from metadrive.policy.idm_policy import IDMPolicy
 from head.policy.rL_planning_policy import RLPlanningPolicy
 from head.envs import StraightConfTraffic, MultiScenario
 import time
-
-warnings.filterwarnings("ignore", category=DeprecationWarning)
 from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
 from functools import partial
+
+# Disable deprecation warnings for now
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 
 class SeedGenerator:
     def __init__(self):
@@ -19,80 +20,80 @@ class SeedGenerator:
         return self.seed
 
 
-def create_env(cfg, seed):
-    # seed = 15
-    env = StraightConfTraffic(dict(map=cfg.args.map_name,
-                                   # This policy setting simplifies the task
-                                   discrete_action=False,
-                                   horizon=400,
-                                   use_render=False,
-                                   agent_policy=RLPlanningPolicy,
-                                   # scenario setting
-                                   traffic_mode="respawn",
-                                   random_spawn_lane_index=False,
-                                   num_scenarios=1,
-                                   driving_reward=3.5,
-                                   speed_reward=0.8,
-                                   start_seed=seed,
-                                   accident_prob=0,
-                                   use_lateral_reward=True,
-                                   log_level=50,
-                                   crash_vehicle_penalty=10.0,
-                                   crash_object_penalty=10.0,
-                                   out_of_road_penalty=10.0,
-                                   scenario_difficulty=cfg.args.scenario_difficulty,
-                                   use_pedestrian=cfg.args.use_pedestrian,
-                                   lane_num=cfg.args.training.lane_num,
-                                   comfort_reward=2.0
-                                   ))
-    print("seed", seed)
-    # env.seed(seed)
-    return env
+class EnvConfig:
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.common_config = {
+            'map': cfg.args.map_name,
+            'discrete_action': False,
+            'horizon': 400,  # Default horizon, can be overridden
+            'use_render': False,
+            'random_spawn_lane_index': False,
+            'num_scenarios': 1,
+            'accident_prob': 0,
+            'use_lateral_reward': True,
+            'crash_vehicle_penalty': 10.0,
+            'crash_object_penalty': 10.0,
+            'out_of_road_penalty': 10.0,
+            'start_seed': None,  # Will be set later
+            'log_level': 50,
+        }
+        self._apply_custom_config(cfg)
+
+    def _apply_custom_config(self, cfg):
+        """Apply the custom settings provided in the config."""
+        if 'staright_config_traffic-v0' in cfg.args.task:
+            self.common_config.update({
+                'driving_reward': 3.5,
+                'speed_reward': 0.8,
+                'traffic_mode': "respawn",
+                'scenario_difficulty': cfg.args.scenario_difficulty,
+                'use_pedestrian': cfg.args.use_pedestrian,
+                'lane_num': cfg.args.training.lane_num,
+                'comfort_reward': 2.0,
+            })
+
+        # Override the horizon for MetaDrive or multi-scenario tasks
+        if 'muti_scenario-v0' in cfg.args.task or 'single_scenario-v0' in cfg.args.task:
+
+            self.common_config['start_seed'] = 5
+            self.common_config['horizon'] = 800
+            self.common_config['random_traffic'] = True  # MetaDrive specific
+            self.common_config['traffic_density'] = 0.15  # MetaDrive specific
 
 
-def create_metadrive_env(cfg, seed):
-    """创建MetaDrive多场景环境"""
-    common_config = dict(
-        map=cfg.args.map_name,
-        discrete_action=False,
-        horizon=800,
-        use_render=False,
-        random_spawn_lane_index=False,
-        num_scenarios=1,
-        start_seed=5,
-        accident_prob=0,
-        random_traffic=True,
-        use_lateral_reward=True,
-        crash_vehicle_penalty=10.0,
-        crash_object_penalty=10.0,
-        out_of_road_penalty=10.0,
-        log_level=50,
-        traffic_density=0.15
-    )
+
+    def create_env(self, seed):
+        """Create the environment based on task type."""
+        config = self.common_config.copy()
 
 
-    env = MetaDriveEnv(common_config)
-    # env.seed(seed)  # 注释掉的种子设置
-    return env
+        if self.cfg.args.task == 'straight_config_traffic-v0':
+            config['start_seed'] = seed
+            # Use StraightConfTraffic for the "straight_config_traffic" task
+            return StraightConfTraffic(config)
+
+        elif self.cfg.args.task in ['muti_scenario-v0', 'single_scenario-v0']:
+            # Use MetaDriveEnv for the "muti_scenario" or "single_scenario" tasks
+            return MetaDriveEnv(config)
+
+        else:
+            print('No task configured.')
+            return None
 
 
 def make_env_sac(cfg):
     print('Env is starting')
     seed_generator = SeedGenerator()
 
-    if cfg.args.task == 'straight_config_traffic-v0':
-        if cfg.args.training.use_vec_env:
-            env = SubprocVecEnv([partial(create_env, cfg, seed_generator.next_seed()) for _ in range(cfg.args.training.env_num)])
-        else:
-            env = create_env(cfg, seed_generator.next_seed())
-
-    elif cfg.args.task == 'muti_scenario-v0' or cfg.args.task == 'single_scenario-v0':
-        if cfg.args.training.use_vec_env:
-            env = SubprocVecEnv([partial(create_metadrive_env, cfg, seed_generator.next_seed()) for _ in range(cfg.args.training.env_num)])
-        else:
-            env = create_metadrive_env(cfg, seed_generator.next_seed())
-
+    # Create a single environment or a vectorized environment
+    env_config = EnvConfig(cfg)
+    if cfg.args.training.use_vec_env:
+        env = SubprocVecEnv(
+            [partial(env_config.create_env, seed_generator.next_seed()) for _ in range(cfg.args.training.env_num)])
     else:
-        env = None
-        print('No task')
+        env = env_config.create_env(seed_generator.next_seed())
+
     return env
+
+

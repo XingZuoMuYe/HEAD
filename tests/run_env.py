@@ -4,35 +4,34 @@ from metadrive import MetaDriveEnv
 from metadrive.policy.idm_policy import IDMPolicy
 from metadrive.utils.draw_top_down_map import draw_top_down_map
 from stable_baselines3.common.monitor import Monitor
+from head.envs.config_traffic_metadrive_env import StraightConfTraffic
 
 
-# TODO: 完善自定义场景的测试脚本
-
-# def create_env(need_monitor=False):
-#     env = StraightConfTraffic(dict(map="SSSSSSSSSSSSSSSS",
-#                                    # This policy setting simplifies the task
-#                                    discrete_action=False,
-#                                    horizon=400,
-#                                    use_render=True,
-#                                    # agent_policy=SafetyImprovementPolicyLinear,
-#                                    # scenario setting
-#                                    traffic_mode="respawn",
-#                                    random_spawn_lane_index=False,
-#                                    num_scenarios=1,
-#                                    start_seed=5,
-#                                    accident_prob=0,
-#                                    use_lateral_reward=True,
-#                                    log_level=50,
-#                                    crash_vehicle_penalty=30.0,
-#                                    crash_object_penalty=30.0,
-#                                    out_of_road_penalty=30.0,
-#                                    scenario_difficulty=0,
-#                                    use_pedestrian=True,
-#                                    lane_num=4,
-#                                    ))
-#     if need_monitor:
-#         env = Monitor(env)
-#     return env
+def create_env(need_monitor=False):
+    env = StraightConfTraffic(dict(map="SSSSSSSSSSSSSSSS",
+                                   # This policy setting simplifies the task
+                                   discrete_action=False,
+                                   horizon=400,
+                                   use_render=True,
+                                   # agent_policy=SafetyImprovementPolicyLinear,
+                                   # scenario setting
+                                   traffic_mode="respawn",
+                                   random_spawn_lane_index=False,
+                                   num_scenarios=1,
+                                   start_seed=5,
+                                   accident_prob=0,
+                                   use_lateral_reward=True,
+                                   log_level=50,
+                                   crash_vehicle_penalty=30.0,
+                                   crash_object_penalty=30.0,
+                                   out_of_road_penalty=30.0,
+                                   scenario_difficulty=0,
+                                   use_pedestrian=True,
+                                   lane_num=4,
+                                   ))
+    if need_monitor:
+        env = Monitor(env)
+    return env
 
 # 创建多场景环境
 def create_multi_scenario_env(need_monitor=False):
@@ -67,7 +66,9 @@ def create_multi_scenario_env(need_monitor=False):
 # 主函数
 if __name__ == "__main__":
     total_reward = 0
-    env = create_multi_scenario_env(need_monitor=False)  # 创建环境
+
+    # env = create_multi_scenario_env(need_monitor=False)  # 创建环境
+    env = create_env()
 
     # 设置绘图
     fig, ax = plt.subplots()

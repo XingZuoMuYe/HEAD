@@ -39,7 +39,6 @@ class ConTrafficManager(BaseManager):
 
         self._traffic_vehicles = []
 
-        # triggered by the event. TODO(lqy) In the future, event trigger can be introduced
         self.block_triggered_vehicles = []
 
         # traffic property

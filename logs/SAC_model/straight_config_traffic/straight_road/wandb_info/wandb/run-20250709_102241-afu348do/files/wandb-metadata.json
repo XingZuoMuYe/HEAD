@@ -1,0 +1,38 @@
+{
+  "os": "Linux-5.15.0-139-generic-x86_64-with-glibc2.31",
+  "python": "CPython 3.9.23",
+  "startedAt": "2025-07-09T02:22:41.979257Z",
+  "program": "/home/test/git_shuo/HEAD/src/SAC_muti_scenarios.py",
+  "codePath": "SAC_muti_scenarios.py",
+  "email": "shuo_yang@tongji.edu.cn",
+  "root": "/home/test/git_shuo/HEAD/logs/SAC_model/straight_config_traffic/straight_road/wandb_info",
+  "host": "test-B760M-DS3H",
+  "executable": "/home/test/anaconda3/envs/HEAD/bin/python",
+  "codePathLocal": "SAC_muti_scenarios.py",
+  "cpu_count": 16,
+  "cpu_count_logical": 24,
+  "gpu": "NVIDIA GeForce RTX 4070 Ti",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "580860411904",
+      "used": "403411820544"
+    }
+  },
+  "memory": {
+    "total": "33475002368"
+  },
+  "cpu": {
+    "count": 16,
+    "countLogical": 24
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce RTX 4070 Ti",
+      "memoryTotal": "12878610432",
+      "cudaCores": 7680,
+      "architecture": "Ada"
+    }
+  ],
+  "cudaVersion": "12.2"
+}

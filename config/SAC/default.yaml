@@ -4,23 +4,29 @@ task_list:
   - straight_config_traffic-v0
   - single_scenario-v0
 
-task: straight_config_traffic-v0
+task: single_scenario-v0
 modality: state
 
 # training
 training:
-
   use_vec_env: False  # 是否使用向量化环境
   env_num: 1  # 向量化环境中的环境数量（仅在 use_vec_env 为 True 时生效）
   show_render_info: True  # 是否显示渲染信息（仅在 use_vec_env 和save_video均为False时生效）
   lane_num: 4  # 车道数量
-  algo_choose: 1  # 算法选择：1: SAC + opti
 
-# wandb configuration
-wandb:
-  use_wandb: True
-  wandb_project: Chapter_1
-  wandb_entity: shuo_yang
+# todo 需调试配置文件正确性
+# 算法具体配置
+algorithm:
+  # 进化算法配置（用于训练和进化策略）
+  evolutionary:
+    use_evolutionary: True  # 是否进行算法进化
+    algorithm_type: 'Poly'
+    selection_method: 'SAC'  # 选择方法（如 'SAC'）
+
+  # 部署算法配置（用于部署学习到的策略）
+  deployment:
+    use_deployment: True  # 是否使用部署学习的策略
+    deployment_method: 'SAC'  # 部署方法（如 'SAC', 'PPO' 等）
 
 # misc
 misc:
@@ -32,3 +38,10 @@ misc:
 # environment-specific settings
 env:
   env_name: metadrive-v0  # 环境名称
+
+# wandb configuration
+wandb:
+  use_wandb: False
+  wandb_project: Chapter_1
+  wandb_entity: shuo_yang
+
