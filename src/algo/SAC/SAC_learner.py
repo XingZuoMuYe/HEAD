@@ -213,6 +213,18 @@ class SAC_Learner:
         self.env = make_env_sac(self.SAC_cfg)
 
 
+    def update_config(self, env_name):
+
+        if env_name == 'S':
+            self.SAC_cfg.args.task = 'straight_config_traffic-v0'
+            self.SAC_cfg.args.map_name = 'SSSSSSSSSSSSSS'
+            # TODO 在random_env中，这两个参数暂时固定
+            self.SAC_cfg.args.scenario_difficulty =  1
+            self.SAC_cfg.args.use_pedestrian =  True
+        else:
+            self.SAC_cfg.args.task = 'muti_scenario-v0'
+            self.SAC_cfg.args.map_name = env_name
+
     def load(self):
         newest_model_path = self.model_path + os.listdir(self.model_path)[0]
         self.agent.load(newest_model_path)
@@ -220,23 +232,16 @@ class SAC_Learner:
 
     def render(self):
         if self.SAC_cfg.args.task == 'straight_config_traffic-v0':
-            # self.env.render(mode="topdown",
-            #                 screen_record=False,
-            #                 scaling=6,
-            #                 film_size=(6000, 400),
-            #                 show_plan_traj=True,
-            #                 )
-            self.env.render(mode="topdown",
+            self.env.head_renderer.render(mode="topdown",
                             screen_record=False,
-                            film_size=(90000, 6000),
+                            scaling=6,
+                            film_size=(6000, 400),
+                            show_plan_traj=True,
                             )
         elif self.SAC_cfg.args.task == 'muti_scenario-v0' or self.SAC_cfg.args.task == 'single_scenario-v0':
-            # self.env.render(mode="topdown",
-            #                 screen_record=False,
-            #                 show_plan_traj=True,
-            #                 )
-            self.env.render(mode="topdown",
+            self.env.head_renderer.render(mode="topdown",
                             screen_record=False,
+                            show_plan_traj=True,
                             )
 
     def train(self):

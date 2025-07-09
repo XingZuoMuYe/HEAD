@@ -4,7 +4,7 @@ task_list:
   - straight_config_traffic-v0
   - single_scenario-v0
 
-task: single_scenario-v0
+task: muti_scenario-v0
 modality: state
 
 # training

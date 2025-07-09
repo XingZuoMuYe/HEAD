@@ -6,6 +6,7 @@ from head.envs import StraightConfTraffic, MultiScenario
 import time
 from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
 from functools import partial
+from head.engine.head_renderer import HeadTopDownRenderer
 
 # Disable deprecation warnings for now
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -30,38 +31,42 @@ class EnvConfig:
             'use_render': False,
             'random_spawn_lane_index': False,
             'num_scenarios': 1,
+            # 'traffic_mode': "respawn",
             'accident_prob': 0,
             'use_lateral_reward': True,
             'crash_vehicle_penalty': 10.0,
             'crash_object_penalty': 10.0,
             'out_of_road_penalty': 10.0,
-            'start_seed': None,  # Will be set later
             'log_level': 50,
+
         }
         self._apply_custom_config(cfg)
 
     def _apply_custom_config(self, cfg):
         """Apply the custom settings provided in the config."""
-        if 'staright_config_traffic-v0' in cfg.args.task:
+        if 'straight_config_traffic-v0' in cfg.args.task:
             self.common_config.update({
+                'agent_policy': RLPlanningPolicy,  # Use RLPlanningPolicy for this task
                 'driving_reward': 3.5,
                 'speed_reward': 0.8,
-                'traffic_mode': "respawn",
+                'start_seed': None,  # Will be set later
                 'scenario_difficulty': cfg.args.scenario_difficulty,
                 'use_pedestrian': cfg.args.use_pedestrian,
                 'lane_num': cfg.args.training.lane_num,
                 'comfort_reward': 2.0,
+                'traffic_mode': "respawn",
             })
+            self.common_config['horizon'] = 400
 
         # Override the horizon for MetaDrive or multi-scenario tasks
-        if 'muti_scenario-v0' in cfg.args.task or 'single_scenario-v0' in cfg.args.task:
-
+        if 'muti_scenario' in cfg.args.task or 'single_scenario' in cfg.args.task:
+            self.common_config.update({
+                'agent_policy': RLPlanningPolicy,  # Use RLPlanningPolicy for this task
+            })
+            self.common_config['horizon'] = 1200
             self.common_config['start_seed'] = 5
-            self.common_config['horizon'] = 800
             self.common_config['random_traffic'] = True  # MetaDrive specific
-            self.common_config['traffic_density'] = 0.15  # MetaDrive specific
-
-
+            self.common_config['traffic_density'] = 0.1  # MetaDrive specific
 
     def create_env(self, seed):
         """Create the environment based on task type."""
@@ -71,15 +76,17 @@ class EnvConfig:
         if self.cfg.args.task == 'straight_config_traffic-v0':
             config['start_seed'] = seed
             # Use StraightConfTraffic for the "straight_config_traffic" task
-            return StraightConfTraffic(config)
-
+            env = StraightConfTraffic(config)
         elif self.cfg.args.task in ['muti_scenario-v0', 'single_scenario-v0']:
             # Use MetaDriveEnv for the "muti_scenario" or "single_scenario" tasks
-            return MetaDriveEnv(config)
-
+            env =  MetaDriveEnv(config)
         else:
             print('No task configured.')
             return None
+        env.reset()
+        env.head_renderer = HeadTopDownRenderer(env)
+        return env
+
 
 
 def make_env_sac(cfg):
@@ -95,5 +102,3 @@ def make_env_sac(cfg):
         env = env_config.create_env(seed_generator.next_seed())
 
     return env
-
-
