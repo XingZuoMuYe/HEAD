@@ -7,7 +7,7 @@ from head.envs import StraightConfTraffic
 import time
 from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
 from functools import partial
-from head.engine.head_renderer import HeadTopDownRenderer
+from head.renderer.head_renderer import HeadTopDownRenderer
 
 # Disable deprecation warnings for now
 warnings.filterwarnings("ignore", category=DeprecationWarning)

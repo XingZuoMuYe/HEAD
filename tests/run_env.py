@@ -4,7 +4,7 @@ from metadrive import MetaDriveEnv
 from metadrive.utils.draw_top_down_map import draw_top_down_map
 from stable_baselines3.common.monitor import Monitor
 from head.envs.config_traffic_metadrive_env import StraightConfTraffic
-from head.engine.head_renderer import HeadTopDownRenderer
+from head.renderer.head_renderer import HeadTopDownRenderer
 from head.policy.evolvable_policy.rL_planning_policy import RLPlanningPolicy
 from metadrive.component.map.base_map import BaseMap
 from metadrive.component.map.pg_map import parse_map_config, MapGenerateMethod

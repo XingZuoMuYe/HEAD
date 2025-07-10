@@ -1,20 +1,26 @@
+"""
+Author: ShuoYang
+Date: 2025-07-10
+Description: config_manager.py
+"""
 
-from src.algo.SAC.cfg import parse_cfg
+# config_manager.py
+
 import argparse
-from src.algo.SAC.SAC_learner import SAC_Learner, SACConfig
 from pathlib import Path
+from head.evolution_engine.RLBoost.SAC.cfg import parse_cfg
+from head.evolution_engine.RLBoost.SAC.SAC_learner import SACConfig
 
-__CONFIG__, __LOGS__ = 'config', 'logs'
-
+__CONFIG__ = 'head/configs'  # 相对 main 文件路径
 
 def to_dict(config):
     ans = dict()
     for i in dir(config):
-        if i.startswith("__"): continue
+        if i.startswith("__"):
+            continue
         x = getattr(config, i)
         ans[i] = x
     return ans
-
 
 def merge_two_dicts(x, y):
     x = to_dict(x)
@@ -22,7 +28,6 @@ def merge_two_dicts(x, y):
     z = x.copy()
     z.update(y)
     return argparse.Namespace(**z)
-
 
 def parse_args_cfgs():
     parser = argparse.ArgumentParser()
@@ -33,20 +38,11 @@ def parse_args_cfgs():
     args = parser.parse_args()
     return args
 
-
-if __name__ == '__main__':
+def get_final_config():
+    """
+    获取合并后的最终配置（命令行参数 + 配置文件）
+    """
     conf = parse_args_cfgs()
-    args = parse_cfg(Path().cwd().parent / __CONFIG__ / "SAC")
-
-    cfg = SACConfig(merge_two_dicts(conf, args))
-
-    if bool(cfg.train_flag):
-        SAC = SAC_Learner(cfg)
-        SAC.agent_initialize()
-        SAC.train()
-
-    else:
-        SAC = SAC_Learner(cfg)
-        SAC.agent_initialize()
-        SAC.load()
-        SAC.eval()
+    args = parse_cfg(Path().cwd().parent / __CONFIG__)
+    merged_args = merge_two_dicts(conf, args)
+    return SACConfig(merged_args)

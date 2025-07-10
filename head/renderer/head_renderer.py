@@ -20,7 +20,7 @@ class HeadTopDownRenderer:
         :return: top_down image
         """
         if self.head_top_down_renderer is None:
-            from head.engine.top_down_renderer import TopDownRenderer
+            from head.renderer.top_down_renderer import TopDownRenderer
             self.head_top_down_renderer = TopDownRenderer(*args, **kwargs)
         return self.head_top_down_renderer.render(text, *args, **kwargs)
 

@@ -93,7 +93,7 @@ class StraightConfTraffic(MetaDriveEnv):
         # info.update({"position": np.array(self.agents['default_agent'].position),
         #              "global_path": self.agents['default_agent'].global_path,
         #              "speed": self.agents['default_agent'].velocity,
-        #              "lat_dis": self.engine.agents['default_agent'].cur_d,
+        #              "lat_dis": self.renderer.agents['default_agent'].cur_d,
         #              "yaw": self.agents['default_agent'].heading
         # })
         return obs, reward, truncate, terminate, info

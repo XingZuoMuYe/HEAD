@@ -9,13 +9,12 @@ LastEditTime: 2021-04-29 13:56:39
 Discription: 
 Environment: 
 '''
-import copy
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-from src.algo.common.memory import ReplayBuffer
-from src.algo.SAC.model import ValueNet, PolicyNet, SoftQNet
+from head.evolution_engine.common.memory import ReplayBuffer
+from head.evolution_engine.RLBoost.SAC.model import PolicyNet, SoftQNet
 
 
 class SAC:
