@@ -33,6 +33,7 @@ def resolve_agent_policy(cfg):
         if algo_type not in EVOLUTIONARY_POLICY_MAPPING:
             raise ValueError(f"Unknown evolutionary algorithm_type '{algo_type}'.")
         policy_class = EVOLUTIONARY_POLICY_MAPPING[algo_type]
+
         print(f"[✅ Agent Policy Selected] Evolutionary → {algo_type}")
         return policy_class
 
