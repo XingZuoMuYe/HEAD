@@ -78,17 +78,16 @@ Li, Quanyi and Peng, Zhenghao and Feng, Lan and Zhang, Qihang and Xue, Zhenghai 
 <a href="https://github.com/metadriverse/metadrive">Code</a>
 ]
 
-
-
-
 ## License
 
 All assets and code are under the [Apache 2.0 license](./LICENSE) unless specified otherwise.
 
 ## 📁 Project Structure
 
+     ``` tree -L 6 -I '__pycache__|*.pyc|*.egg-info|venv' > structure.txt
+
+
 ```text
-.
 ├── assets
 │   ├── closed_loop_structure.jpg
 │   ├── experiment_2.jpg
@@ -96,91 +95,83 @@ All assets and code are under the [Apache 2.0 license](./LICENSE) unless specifi
 │   ├── HEAD-icon.jpg
 │   ├── HEAD.jpg
 │   └── HEAD-structure.png
-├── config
-│   └── SAC
-│       ├── default.yaml
-│       └── tasks
-│           ├── default.yaml
-│           ├── muti_scenario.yaml
-│           ├── single_scenario.yaml
-│           └── straight_config_traffic.yaml
 ├── head
-│   ├── engine
-│   │   ├── head_renderer.py
-│   │   └── top_down_renderer.py
+│   ├── configs
+│   │   ├── default.yaml
+│   │   └── tasks
+│   │       ├── default.yaml
+│   │       ├── muti_scenario.yaml
+│   │       ├── single_scenario.yaml
+│   │       └── straight_config_traffic.yaml
 │   ├── envs
 │   │   ├── config_traffic_metadrive_env.py
 │   │   ├── __init__.py
 │   │   └── multi_scenario_metadrive_env.py
-│   ├── __init__.py
-│   ├── manager
-│   │   ├── config_pedestrain_manager.py
-│   │   └── config_traffic_manager.py
-│   └── policy
-│       ├── basic_policy
-│       │   ├── idm_policy_include_pedestrian.py
-│       │   └── __init__.py
-│       ├── evolvable_policy
-│       │   ├── common
-│       │   │   ├── cfgs
-│       │   │   │   └── config.yaml
-│       │   │   ├── config.py
-│       │   │   ├── __init__.py
-│       │   │   ├── local_planner
-│       │   │   │   ├── cubic_spline_planner.py
-│       │   │   │   ├── frenet_optimal_trajectory.py
-│       │   │   │   ├── __init__.py
-│       │   │   │   ├── setup.py
-│       │   │   │   └── spline_utils.pyx
-│       │   │   ├── low_level_controller
-│       │   │   │   ├── controller.py
-│       │   │   │   └── __init__.py
-│       │   │   ├── tools
-│       │   │   │   ├── __init__.py
-│       │   │   │   ├── misc.py
-│       │   │   │   └── utils.py
-│       │   │   └── utils.py
-│       │   ├── __init__.py
-│       │   └── rL_planning_policy.py
-│       └── __init__.py
-├── LICENSE
-├── logs
-├── models
-│   └── SAC_model
-│       └── checkpoints
-│           ├── muti_scenario
-│           ├── single_scenario
-│           └── straight_config_traffic
-│               ├── straight_road
-│               └── straight_road_no_pedestrian
-├── README.md
-├── requirements.txt
-├── results
-│   └── SAC_model
-│       ├── muti_scenario
-│       │   └── XCO
-│       ├── single_scenario
-│       │   └── inRamp
-│       └── straight_config_traffic
-│           ├── straight_road
-│           └── straight_road_no_pedestrian
-├── src
-│   ├── algo
+│   ├── evolution_engine
 │   │   ├── common
+│   │   │   ├── __init__.py
 │   │   │   ├── memory.py
 │   │   │   ├── model.py
 │   │   │   ├── multiprocessing_env.py
 │   │   │   ├── plot.py
 │   │   │   ├── running_mean_std.py
 │   │   │   └── utils.py
-│   │   └── SAC
-│   │       ├── agent.py
-│   │       ├── cfg.py
-│   │       ├── env.py
-│   │       ├── logger.py
-│   │       ├── model.py
-│   │       └── SAC_learner.py
-│   └── SAC_muti_scenarios.py
+│   │   ├── env_builder
+│   │   │   ├── env.py
+│   │   │   └── __init__.py
+│   │   ├── __init__.py
+│   │   └── RLBoost
+│   │       ├── __init__.py
+│   │       └── SAC
+│   │           ├── agent.py
+│   │           ├── cfg.py
+│   │           ├── __init__.py
+│   │           ├── logger.py
+│   │           ├── model.py
+│   │           └── SAC_learner.py
+│   ├── __init__.py
+│   ├── manager
+│   │   ├── algorithm_selector.py
+│   │   ├── config_manager.py
+│   │   ├── config_pedestrain_manager.py
+│   │   ├── config_traffic_manager.py
+│   │   ├── evolution_selector.py
+│   │   └── __init__.py
+│   ├── policy
+│   │   ├── basic_policy
+│   │   │   ├── idm_policy_include_pedestrian.py
+│   │   │   └── __init__.py
+│   │   ├── evolvable_policy
+│   │   │   ├── common
+│   │   │   │   ├── cfgs
+│   │   │   │   │   └── config.yaml
+│   │   │   │   ├── config.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── local_planner
+│   │   │   │   │   ├── cubic_spline_planner.py
+│   │   │   │   │   ├── frenet_optimal_trajectory.py
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── setup.py
+│   │   │   │   │   └── spline_utils.pyx
+│   │   │   │   ├── low_level_controller
+│   │   │   │   │   ├── controller.py
+│   │   │   │   │   └── __init__.py
+│   │   │   │   ├── tools
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── misc.py
+│   │   │   │   │   └── utils.py
+│   │   │   │   └── utils.py
+│   │   │   ├── __init__.py
+│   │   │   └── poly_planning_policy.py
+│   │   └── __init__.py
+│   └── renderer
+│       ├── head_renderer.py
+│       └── top_down_renderer.py
+├── LICENSE
+├── README.md
+├── requirements.txt
+├── scripts
+│   └── main_head.py
 ├── structure.txt
 └── tests
     ├── drive_in_real_env.py
@@ -188,9 +179,7 @@ All assets and code are under the [Apache 2.0 license](./LICENSE) unless specifi
     ├── map.jpg
     └── run_env.py
 
-39 directories, 59 files
-
-
+22 directories, 68 files
 ```
 
 
