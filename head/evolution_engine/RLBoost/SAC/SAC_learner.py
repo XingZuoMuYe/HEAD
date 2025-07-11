@@ -39,7 +39,7 @@ def generate_paths(args) -> dict:
         - eval_save_path: 评估结果保存路径
     """
     # 获取项目根路径
-    root_path = get_project_root()
+    root_path = get_project_root().parent
 
     # 解析任务名称和地图名称
     task = args.task.split('-')[0]
@@ -60,11 +60,10 @@ def generate_paths(args) -> dict:
 
     # 动态生成路径
     base = ""
-
-    base_result_path = root_path / "logs" / base / "SAC_model" / task / map_name
-    model_save_path = root_path / "models" / base / "SAC_model" / "checkpoints" / task / map_name
-    log_save_path = root_path / "logs" / base / "SAC_model" / task / map_name
-    eval_save_path = root_path / "results" / base / "SAC_model" / task / map_name
+    base_result_path = root_path /"artifacts"/ "logs" / base / "RLBoost_SAC" / task / map_name
+    model_save_path = root_path /"artifacts"/ "models" / base / "RLBoost_SAC" / "checkpoints" / task / map_name
+    log_save_path = root_path /"artifacts"/ "logs" / base / "RLBoost_SAC" / task / map_name
+    eval_save_path = root_path /"artifacts"/ "eval" / base / "RLBoost_SAC" / task / map_name
 
     # 创建目录（如果不存在）
     for path in [base_result_path, model_save_path, log_save_path, eval_save_path]:

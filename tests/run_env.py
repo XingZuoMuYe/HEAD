@@ -5,7 +5,8 @@ from metadrive.utils.draw_top_down_map import draw_top_down_map
 from stable_baselines3.common.monitor import Monitor
 from head.envs.config_traffic_metadrive_env import StraightConfTraffic
 from head.renderer.head_renderer import HeadTopDownRenderer
-from head.policy.evolvable_policy.rL_planning_policy import RLPlanningPolicy
+from head.policy.evolvable_policy.poly_planning_policy import RLPlanningPolicy
+from metadrive.policy.env_input_policy import EnvInputPolicy
 from metadrive.component.map.base_map import BaseMap
 from metadrive.component.map.pg_map import parse_map_config, MapGenerateMethod
 from metadrive.component.algorithm.blocks_prob_dist import PGBlockDistConfig
@@ -15,7 +16,7 @@ def create_env(need_monitor=False):
                                    discrete_action=False,
                                    horizon=400,
                                    use_render=False,
-                                   agent_policy=RLPlanningPolicy,
+                                   agent_policy=EnvInputPolicy,
                                    # scenario setting
                                    traffic_mode="respawn",
                                    random_spawn_lane_index=False,
@@ -52,7 +53,7 @@ def create_multi_scenario_env(need_monitor=False):
         discrete_action=False,  # 使用连续动作空间
         horizon=2800,  # 设定最大时间步数
         use_render=False,  # 是否渲染环境
-        agent_policy=RLPlanningPolicy,  # 使用IDM策略
+        # agent_policy=EnvInputPolicy,  # 使用IDM策略
         random_spawn_lane_index=True,  # 随机生成车道索引
         num_scenarios=1,  # 场景数量
         start_seed=5,  # 随机种子
@@ -113,6 +114,7 @@ if __name__ == "__main__":
         while True:
             t1 = time.time()
             action = env.action_space.sample()  # 随机选择一个动作
+            action = [0.1, 1.0]
             obs, reward, truncate, terminate, info = env.step(action)  # 执行动作并获取反馈
             total_reward += reward  # 累加奖励
 

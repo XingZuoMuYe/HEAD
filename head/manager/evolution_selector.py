@@ -38,4 +38,5 @@ def resolve_evolution_strategy(cfg):
 
     # 返回策略类实例（只传 cfg）
     StrategyClass = EVOLUTION_STRATEGY_MAPPING[main][sub]
+    print(f"[✅ Evolution Strategy Selected] → {main}/{sub}")
     return StrategyClass

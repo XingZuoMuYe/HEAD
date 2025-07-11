@@ -6,8 +6,8 @@ Description: main_head.py
 
 # main_head.py
 
-from config_manager import get_final_config
-from evolution_selector import resolve_evolution_strategy
+from head.manager.config_manager import get_final_config
+from head.manager.evolution_selector import resolve_evolution_strategy
 
 
 if __name__ == '__main__':
