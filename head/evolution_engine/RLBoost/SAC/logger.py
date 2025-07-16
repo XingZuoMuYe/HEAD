@@ -50,19 +50,11 @@ class VideoRecorder:
         if not self.enabled:
             return
 
-        # Common render parameters
-        # render_params = {
-        #     "mode": "topdown",
-        #     "screen_record": False,
-        #     "window": False,
-        #     "show_plan_traj": True
-        # }
-
         render_params = {
             "mode": "topdown",
             "screen_record": False,
             "window": False,
-            # "show_plan_traj": True
+            "show_plan_traj": True
         }
 
         # Specific task configurations
@@ -71,10 +63,10 @@ class VideoRecorder:
                 "scaling": 6,
                 "film_size": (6000, 400)
             })
-            frame = env.render(**render_params)
+            frame = env.head_renderer.render(**render_params)
 
         elif self.cfg.task in ['muti_scenario-v0', 'single_scenario-v0']:
-            frame = env.render(**render_params)
+            frame = env.head_renderer.render(**render_params)
 
         else:
             frame = []

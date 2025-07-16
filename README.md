@@ -21,6 +21,8 @@ HEAD is a holistic suite of evolutionary autonomous driving software, based on t
     conda create -n HEAD python=3.9
     conda activate HEAD
     pip install -r requirements.txt
+   cd head
+   pip install -e .
     ```
    
 

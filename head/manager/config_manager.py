@@ -43,6 +43,6 @@ def get_final_config():
     获取合并后的最终配置（命令行参数 + 配置文件）
     """
     conf = parse_args_cfgs()
-    args = parse_cfg(Path().cwd().parent / __CONFIG__)
+    args = parse_cfg(Path().cwd() / __CONFIG__)
     merged_args = merge_two_dicts(conf, args)
     return SACConfig(merged_args)

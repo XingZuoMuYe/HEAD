@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "head"
+version = "0.1.0"
+description = "HEAD project"
+authors = [{name = "Shuo Yang", email = "shuo_yang@tongji.edu.cn"}]
+dependencies = []
+
+[tool.setuptools]
+packages = [
+    "envs",
+    "policy",
+    "configs",
+    "manager",
+    "renderer",
+    "evolution_engine"
+]
