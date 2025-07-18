@@ -3,15 +3,16 @@ task_list:
   - muti_scenario-v0
   - straight_config_traffic-v0
   - single_scenario-v0
+  - real_scenario-v0
 
-task: muti_scenario-v0
+task: real_scenario-v0
 modality: state
 
 # training
 training:
-  use_vec_env: True  # 是否使用向量化环境
+  use_vec_env: False  # 是否使用向量化环境
   env_num: 1  # 向量化环境中的环境数量（仅在 use_vec_env 为 True 时生效）
-  show_render_info: False  # 是否显示渲染信息（仅在 use_vec_env 和save_video均为False时生效）
+  show_render_info: True  # 是否显示渲染信息（仅在 use_vec_env 和save_video均为False时生效）
   lane_num: 4  # 车道数量
 
 # 算法具体配置
@@ -55,7 +56,7 @@ env:
 
 # wandb configuration
 wandb:
-  use_wandb: True
+  use_wandb: False
   wandb_project: Head
   wandb_entity: shuo_yang
 

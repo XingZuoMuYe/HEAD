@@ -1,4 +1,6 @@
 import warnings
+
+from metadrive.envs import ScenarioEnv
 from metadrive.envs import MetaDriveEnv
 
 from head.envs import StraightConfTraffic
@@ -7,6 +9,7 @@ from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
 from functools import partial
 from head.renderer.head_renderer import HeadTopDownRenderer
 from head.manager.algorithm_selector import resolve_agent_policy
+from head.policy.evolvable_policy import poly_planning_policy
 
 # Disable deprecation warnings for now
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -70,6 +73,12 @@ class EnvConfig:
             self.common_config['random_traffic'] = True  # MetaDrive specific
             self.common_config['traffic_density'] = 0.1  # MetaDrive specific
 
+        if 'real_scenario-v0' in cfg.args.task:
+            # 清理与 ScenarioEnv 无关的键
+            for key in ['random_spawn_lane_index', 'map_config', 'accident_prob', 'use_lateral_reward']:
+                self.common_config.pop(key, None)  # 第二个参数 None 避免 KeyError
+            self.common_config['data_directory'] = cfg.args.database_path
+
     def create_env(self, seed):
         """Create the environment based on task type."""
         config = self.common_config.copy()
@@ -80,6 +89,9 @@ class EnvConfig:
 
         elif self.cfg.args.task in ['muti_scenario-v0', 'single_scenario-v0']:
             env =  MetaDriveEnv(config)
+
+        elif self.cfg.args.task in ['real_scenario-v0']:
+            env = ScenarioEnv(config)
 
         else:
             print('No task configured.')
