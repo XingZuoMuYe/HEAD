@@ -239,6 +239,19 @@ class SAC_Learner:
                             screen_record=False,
                             show_plan_traj=True,
                             )
+        elif self.SAC_cfg.args.task == 'real_scenario-v0':
+            self.env.head_renderer.render(mode="topdown",
+                            show_plan_traj=True,
+                            show_agent_name=False,
+                            film_size=(5500, 5500),
+                            scaling=3,
+                            screen_size=(800, 800),
+                            screen_record=False,
+                            text={
+                                # "step": t,
+                                "scenario index": self.env.engine.global_seed + self.env.config["start_scenario_index"],
+                            }
+                            )
 
     def train(self):
         if self.SAC_cfg.args.training.use_vec_env:
