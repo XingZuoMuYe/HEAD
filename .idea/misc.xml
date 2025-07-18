@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="HEAD" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="metadrive" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="HEAD" project-jdk-type="Python SDK" />
 </project>

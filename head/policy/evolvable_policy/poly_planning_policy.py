@@ -70,14 +70,22 @@ class RLPlanningPolicy(EnvInputPolicy):
         checkpoints = self.control_object.navigation.checkpoints
         global_center_points = np.empty((0, 2))
         if isinstance(self.control_object.navigation, TrajectoryNavigation):
-            if len(checkpoints) < 4:
-                print('checkpoints', len(checkpoints))
-                # 如果 checkpoints 少于 3 个点，获取起点和终点
+            if len(checkpoints) < 2:
+                # print('checkpoints', len(checkpoints))
+                # 起点
                 start_point = checkpoints[0]
-                end_point = checkpoints[-1]
+                heading = math.radians(self.control_object.navigation.current_heading_theta_at_long)
+
+                # 沿着航向向前延申1米作为伪终点
+                direction = np.array([np.cos(heading), np.sin(heading)])
+                end_point = start_point + 1.0 * direction
+
+                # 构造插值点
                 checkpoints = np.linspace(start_point, end_point, num=4)
-                print('start_point', start_point, 'end_point',end_point)
+                # print('start_point', start_point, 'fake end_point', end_point)
+
             global_center_points = np.array(checkpoints)
+
             global_path = smooth_curve(global_center_points, dis=0.5)
         else:
             for i in range(len(checkpoints) - 1):
@@ -100,7 +108,6 @@ class RLPlanningPolicy(EnvInputPolicy):
 
         if isinstance(self.control_object.navigation, TrajectoryNavigation):
             lane_num = self.get_current_lane_info()
-            print('lane_num',lane_num)
             lane_width = 3.5
         else:
             lane_num = self.engine.global_config.map_config['lane_num']

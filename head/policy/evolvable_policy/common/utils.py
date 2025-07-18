@@ -36,6 +36,18 @@ def rgb_normalize(color):
 
 
 def smooth_curve(waypoint, dis=0.2):
+    if len(waypoint) < 4:
+        # print(f"[WARN] smooth_curve: too few points ({len(waypoint)}), using linear fallback.")
+        fx = waypoint[:, 0]
+        fy = waypoint[:, 1]
+        dx = np.diff(fx)
+        dy = np.diff(fy)
+        ftheta = np.arctan2(dy, dx)
+        ftheta = np.append(ftheta, ftheta[-1])
+        fdL = np.sqrt(dx ** 2 + dy ** 2)
+        fdL = np.append(fdL, fdL[-1])
+        fkappa = np.zeros_like(fx)
+        return [fx, fy, ftheta, fkappa]
     i = 1
     a = len(waypoint)
     index = []

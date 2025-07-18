@@ -17,7 +17,7 @@ read -p "请确认配置文件已修改完毕 (y/n): " confirm
 
 if [ "$confirm" == "y" ]; then
     # 运行 Python 脚本
-    python -m head.scripts.main_head --train_flag=1 --total_steps=1000000 --train_name=experiment_1
+    python -m head.scripts.main_head --train_flag=1 --total_steps=1000000 --train_name=generation716_avoid
 else
     echo "请先修改配置文件，然后重新运行脚本。"
 fi

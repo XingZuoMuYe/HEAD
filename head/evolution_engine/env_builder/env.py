@@ -78,6 +78,10 @@ class EnvConfig:
             for key in ['random_spawn_lane_index', 'map_config', 'accident_prob', 'use_lateral_reward']:
                 self.common_config.pop(key, None)  # 第二个参数 None 避免 KeyError
             self.common_config['data_directory'] = cfg.args.database_path
+            self.common_config.update({
+                "num_scenarios": 492,
+                "reactive_traffic": True
+            })
 
     def create_env(self, seed):
         """Create the environment based on task type."""

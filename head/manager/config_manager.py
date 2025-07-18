@@ -33,7 +33,7 @@ def parse_args_cfgs():
     parser = argparse.ArgumentParser()
     parser.add_argument('--train_flag', type=int, default=1,
                         help='train = 1 or eval = 0')
-    parser.add_argument('--train_name', type=str, default='train_1')
+    parser.add_argument('--train_name', type=str, default='experiment_1')
     parser.add_argument('--total_steps', type=float, default=1e6)
     args = parser.parse_args()
     return args
