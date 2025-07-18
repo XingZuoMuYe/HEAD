@@ -3,6 +3,7 @@ from metadrive.policy.idm_policy import IDMPolicy
 from metadrive.envs.metadrive_env import MetaDriveEnv
 from metadrive.envs.base_env import BaseEnv
 from typing import Union, Dict, AnyStr, Optional, Tuple, Callable
+from head.renderer.head_renderer import HeadTopDownRenderer
 from metadrive.utils import clip, Config
 import numpy as np
 import sys
@@ -62,6 +63,7 @@ class StraightConfTraffic(MetaDriveEnv):
 
     def __init__(self, config=None):
         super(StraightConfTraffic, self).__init__(config)
+        self.head_renderer = None
 
     # 这部分代码是一个类的初始化方法（`__init__`），其中传入了一个可选参数`config`。在初始化方法中，首先对类中的属性
     # `default_config_copy`进行赋值操作：
@@ -73,6 +75,9 @@ class StraightConfTraffic(MetaDriveEnv):
     # `config`传递给父类的初始化方法以完成对象的初始化工作。通过调用`super()`函数，可以实现在子类中对父类的方法进行调用。
 
     def reset(self, *args, **kwargs):
+        self.head_renderer = HeadTopDownRenderer(self)
+        if self.head_renderer is not None:
+            self.head_renderer.reset()
         return super(StraightConfTraffic, self).reset(*args, **kwargs)
 
     def setup_engine(self):

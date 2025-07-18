@@ -3,7 +3,7 @@ import warnings
 from metadrive.envs import ScenarioEnv
 from metadrive.envs import MetaDriveEnv
 
-from head.envs import StraightConfTraffic
+from head.envs import StraightConfTraffic, MultiScenario, RealScenarioEnv
 import time
 from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
 from functools import partial
@@ -92,16 +92,15 @@ class EnvConfig:
             env = StraightConfTraffic(config)
 
         elif self.cfg.args.task in ['muti_scenario-v0', 'single_scenario-v0']:
-            env =  MetaDriveEnv(config)
+            env =  MultiScenario(config)
 
         elif self.cfg.args.task in ['real_scenario-v0']:
-            env = ScenarioEnv(config)
+            env = RealScenarioEnv(config)
 
         else:
             print('No task configured.')
             return None
         env.reset()
-        env.head_renderer = HeadTopDownRenderer(env)
         return env
 
 

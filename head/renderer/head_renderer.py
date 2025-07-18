@@ -36,3 +36,11 @@ class HeadTopDownRenderer:
             ret = self._render_topdown(text=text, *args, **kwargs)
             return ret
         return None
+
+    def reset(self):
+        """
+        Reset the renderer.
+        This is a placeholder function for compatibility.
+        """
+        if self.head_top_down_renderer is not None:
+            self.head_top_down_renderer.close()
