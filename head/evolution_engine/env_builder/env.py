@@ -1,8 +1,6 @@
 import warnings
 
-from metadrive.envs import ScenarioEnv
-from metadrive.envs import MetaDriveEnv
-
+from metadrive.scenario.utils import read_dataset_summary
 from head.envs import StraightConfTraffic, MultiScenario, RealScenarioEnv
 import time
 from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
@@ -78,8 +76,10 @@ class EnvConfig:
             for key in ['random_spawn_lane_index', 'map_config', 'accident_prob', 'use_lateral_reward']:
                 self.common_config.pop(key, None)  # 第二个参数 None 避免 KeyError
             self.common_config['data_directory'] = cfg.args.database_path
+            _, files, _ = read_dataset_summary(cfg.args.database_path)
+            num_scenarios = len(files)
             self.common_config.update({
-                "num_scenarios": 492,
+                "num_scenarios": num_scenarios,
                 "reactive_traffic": True
             })
 
