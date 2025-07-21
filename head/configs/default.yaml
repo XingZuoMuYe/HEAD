@@ -1,0 +1,61 @@
+# environment
+task_list:
+  - muti_scenario-v0
+  - straight_config_traffic-v0
+  - single_scenario-v0
+
+task: straight_config_traffic-v0
+modality: state
+
+# training
+training:
+  use_vec_env: False  # 是否使用向量化环境
+  env_num: 1  # 向量化环境中的环境数量（仅在 use_vec_env 为 True 时生效）
+  show_render_info: True  # 是否显示渲染信息（仅在 use_vec_env 和save_video均为False时生效）
+  lane_num: 4  # 车道数量
+
+# 算法具体配置
+algorithm:
+  # 进化算法配置（用于训练和进化策略）
+  evolutionary:
+    use_evolutionary: True  # 是否进行算法进化
+    algorithm_type:
+      main: Poly  # 待进化算法类型（如 Poly）
+
+      candidates:
+        Poly
+        Zero
+
+    selection_method: # 选择方法（如 RLBoost --> SAC）
+      main: RLBoost
+      sub: SAC
+
+      candidates:
+        RLBoost:
+          - SAC
+          - PPO
+        DreamMethod:
+          - HeadMethodInDream
+
+  # 部署算法配置
+  deployment:
+    use_deployment: False  # 是否进行部署
+    deployment_method: 'IDM'  # 部署方法（如 'IDM' 等）
+
+# misc
+misc:
+  seed: 10  # 随机种子
+  eval_freq: 100000  # 评估频率（每多少步评估一次）
+  eval_episodes: 1  # 每次评估的 episode 数量
+  save_video: False  # 是否保存视频
+
+# environment-specific settings
+env:
+  env_name: metadrive-v0  # 环境名称
+
+# wandb configuration
+wandb:
+  use_wandb: True
+  wandb_project: Head
+  wandb_entity: shuo_yang
+

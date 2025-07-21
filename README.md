@@ -23,139 +23,6 @@ HEAD is a holistic suite of evolutionary autonomous driving software, based on t
     pip install -r requirements.txt
     ```
    
-## Adversarial Loop
-The adversarial loop refers to a training framework where adversarial examples or environmental perturbations are introduced to improve the robustness and generalization ability of a model. 
-\
-Adversarial loops are commonly used in reinforcement learning and security research to enhance an agent's adaptability to uncertain and harsh environments.
-1. **Enter Adversarial Loop**
-   ```bash
-   cd ./HEAD/adversarial_loop
-   ```
-2. **Launch Basic Experiment**
-   ```bash
-   python training_main.py
-   ```
-
-## Algorithmic Evolution Loop
-
-The algorithmic evolution loop is based on the Dynamic Progressive Optimization Framework, 
-which supports the progressive optimization and continuous adaptation of expert agents through data aggregation 
-and multi-expert strategy distillation. 
-The framework first uses reinforcement learning to generate diverse cross-scenario datasets, 
-accumulating strategy knowledge through trial and error. 
-Subsequently, a continual learning model incrementally trains the data using imitation learning, 
-incorporating new scenarios and datasets. By embedding sub-expert models and a gating mechanism within the constant learning, 
-the framework enables adaptive strategy learning and optimization across scenarios. 
-Ultimately, the framework generates expert agents capable of making efficient decisions and demonstrating long-term adaptability.
-
-**Enter Algorithmic Evolution Loop**
-
-```bash
-cd ./HEAD/adversarial_evolution_loop
-```
-
-**Training Reinforcement learning Experts**
-
-```
-python SAC_muti_scenario_con.py
-```
-
-**Launch Continual Model**
-
-```bash
-python train.py
-```
-
-**Evaluate the Model**
-
-``` bash
-python eval_in_env.py
-```
-
-This is the PyTorch implementation for training and evaluating the project. The project mainly includes training files, testing files, and model files.
-` train.py`  is used to train the constant learning model implemented in this project. `train_benchmark.py` is used to train the models for comparison experiments. Using ` train.py`  as an example, the following are important parameter settings during training:
-
---` model_path` : Path to save checkpoints
-\
---` layers` : Number of layers per task
-\
---` sizes` Input/output size of the model
-\
---` task_n_epochs` : Number of epochs for round n training
-\
---` data_paths` : Paths to the training dataset
-
-Evaluation eval_in_env.py is used to evaluate the trained model in MetaDrive:
-\
---` expert_num` : Number of experts in the trained model
-\
---` layers` : Number of layers per task
-\
---` sizes` : Input/output size of the model
-\
---` model_path` : Full path to the model checkpoint to be evaluated
-\
---` eval_eps` : Number of evaluation episodes
-\
---` render` : Use 1 to enable window visualization, 0 to disable
-
-Model ` ConstantLearning.py`  is the specific implementation of the model.
-
-## Self-Learning Loop
-A self-learning loop is an unsupervised learning strategy where the model learns through self-supervision. 
-\
-The self-training loop is commonly used in scenarios with limited labeled data or high annotation costs, such as image classification and natural language processing.
-1. **Enter Self-Learning Loop**
-   ```bash
-   cd ./HEAD/self-learning_loop
-   ```
-   
-2. **Real Scenario Reproduction**
-   ```bash
-   cd ./scenario_reproduction
-   ```
-   1. Convert the recorded bag files from the actual vehicle to csv files
-   \
-   PS: Please note your ROS version
-   `rostopic echo -b input.bag -p /output > output.csv`
-   2. In **obj_info.py**, load your bag file, extract vehicle and pedestrian information, and store it as an **obj_info.pkl** file.
-   3. Load the map osm file, and in **osm_scenario.py**, extract road information and save in **map_features.pkl**.
-   4. In **run_main.py**, load vehicle and pedestrian information **obj_info.pkl** and  map lane information **map_features.pkl**, integrate the information into  `ScenarioDescription` format for reproduction in metadrive, and save in the `dataset/`.
-   5. If you'd like to visualize the transferred scenario, please run:
-      ```bash
-      python -m scenarionet.sim -d /path_to_your scenario_reproduction/dataset --render 2D/3D
-      ```
-3. **Launch Basic Experiment**
-
-   Run **SAC\_multi\_scenario\_con.py**
-\
-Set the `--database_path` to processed dataset for training and evaluation.
-\
-This file is the main function for training and evaluating the reinforcement learning agent.
-\
-The training and testing process can be viewed online via tensorboard:
-`tensorboard --logdir = /path_to_your_model/test`
-\
-PS: You can also load public datasets such as waymo, nuscenes, nuplan(which need to be processed by scenarionet's convert to a unified format)
-## Typical Experiments Result
-
-### Algorithmic Evolution Loop
-![Algorithmic Evolution Loop Result](./assets/experiment.jpg)
-The experimental results demonstrate that the **Algorithmic Evolution Loop**, powered by Constant Learning, 
-significantly improves the performance of autonomous driving systems. 
-By leveraging gradual optimization, dynamic expansion of the expert network, and adaptive mechanisms, this loop enables the system to effectively handle complex and edge cases. 
-Through iterative learning from new failure cases and continuous adaptation in dynamic environments, the loop drives rapid model evolution, leading to enhanced performance and robustness over time.
-
-
-
-
-#### HEAD Evolution Experiment
-![HEAD Evolution Experiment](./assets/experiment_2.jpg)
-The experimental results on the **HEAD** platform demonstrate a significant improvement in autonomous driving system performance in complex and uncertain scenarios.
-Through the three-round self-learning loop, the agent’s rewards steadily increased, showcasing its ability to adapt progressively to challenging environments. 
-In contrast, during the self-adversarial loop, the reward notably decreased, highlighting the effectiveness of adversarial scenarios in uncovering system weaknesses and driving further evolution. 
-Models trained over multiple rounds outperformed those trained in a single self-learning round, validating the superiority of this iterative self-evolution mechanism. 
-These findings confirm that **HEAD Evolution** paradigm enhances the intelligence and adaptability of autonomous driving systems.
 
 
 
@@ -211,12 +78,109 @@ Li, Quanyi and Peng, Zhenghao and Feng, Lan and Zhang, Qihang and Xue, Zhenghai 
 <a href="https://github.com/metadriverse/metadrive">Code</a>
 ]
 
-
-
-
 ## License
 
 All assets and code are under the [Apache 2.0 license](./LICENSE) unless specified otherwise.
+
+## 📁 Project Structure
+
+     ``` tree -L 6 -I '__pycache__|*.pyc|*.egg-info|venv' > structure.txt
+
+
+```text
+├── assets
+│   ├── closed_loop_structure.jpg
+│   ├── experiment_2.jpg
+│   ├── experiment.jpg
+│   ├── HEAD-icon.jpg
+│   ├── HEAD.jpg
+│   └── HEAD-structure.png
+├── head
+│   ├── configs
+│   │   ├── default.yaml
+│   │   └── tasks
+│   │       ├── default.yaml
+│   │       ├── muti_scenario.yaml
+│   │       ├── single_scenario.yaml
+│   │       └── straight_config_traffic.yaml
+│   ├── envs
+│   │   ├── config_traffic_metadrive_env.py
+│   │   ├── __init__.py
+│   │   └── multi_scenario_metadrive_env.py
+│   ├── evolution_engine
+│   │   ├── common
+│   │   │   ├── __init__.py
+│   │   │   ├── memory.py
+│   │   │   ├── model.py
+│   │   │   ├── multiprocessing_env.py
+│   │   │   ├── plot.py
+│   │   │   ├── running_mean_std.py
+│   │   │   └── utils.py
+│   │   ├── env_builder
+│   │   │   ├── env.py
+│   │   │   └── __init__.py
+│   │   ├── __init__.py
+│   │   └── RLBoost
+│   │       ├── __init__.py
+│   │       └── SAC
+│   │           ├── agent.py
+│   │           ├── cfg.py
+│   │           ├── __init__.py
+│   │           ├── logger.py
+│   │           ├── model.py
+│   │           └── SAC_learner.py
+│   ├── __init__.py
+│   ├── manager
+│   │   ├── algorithm_selector.py
+│   │   ├── config_manager.py
+│   │   ├── config_pedestrain_manager.py
+│   │   ├── config_traffic_manager.py
+│   │   ├── evolution_selector.py
+│   │   └── __init__.py
+│   ├── policy
+│   │   ├── basic_policy
+│   │   │   ├── idm_policy_include_pedestrian.py
+│   │   │   └── __init__.py
+│   │   ├── evolvable_policy
+│   │   │   ├── common
+│   │   │   │   ├── cfgs
+│   │   │   │   │   └── config.yaml
+│   │   │   │   ├── config.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── local_planner
+│   │   │   │   │   ├── cubic_spline_planner.py
+│   │   │   │   │   ├── frenet_optimal_trajectory.py
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── setup.py
+│   │   │   │   │   └── spline_utils.pyx
+│   │   │   │   ├── low_level_controller
+│   │   │   │   │   ├── controller.py
+│   │   │   │   │   └── __init__.py
+│   │   │   │   ├── tools
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── misc.py
+│   │   │   │   │   └── utils.py
+│   │   │   │   └── utils.py
+│   │   │   ├── __init__.py
+│   │   │   └── poly_planning_policy.py
+│   │   └── __init__.py
+│   └── renderer
+│       ├── head_renderer.py
+│       └── top_down_renderer.py
+├── LICENSE
+├── README.md
+├── requirements.txt
+├── scripts
+│   └── main_head.py
+├── structure.txt
+└── tests
+    ├── drive_in_real_env.py
+    ├── env_render_plot.py
+    ├── map.jpg
+    └── run_env.py
+
+22 directories, 68 files
+```
 
 
 

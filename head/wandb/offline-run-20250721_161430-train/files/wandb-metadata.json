@@ -1,0 +1,24 @@
+{
+    "os": "Linux-5.4.0-150-generic-x86_64-with-glibc2.27",
+    "python": "3.9.19",
+    "heartbeatAt": "2025-07-21T08:14:30.543539",
+    "startedAt": "2025-07-21T08:14:30.516239",
+    "docker": null,
+    "gpu": "NVIDIA GeForce GTX 1660 Ti with Max-Q Design",
+    "gpu_count": 1,
+    "cpu_count": 12,
+    "cuda": null,
+    "args": null,
+    "state": "running",
+    "program": "/home/peter/\u4e0b\u8f7d/Head/scripts/train.py",
+    "codePath": "scripts/train.py",
+    "git": {
+        "remote": "https://github.com/XingZuoMuYe/HEAD.git",
+        "commit": "e2a741bf40e549caf6aeea2e761a90d49439bdde"
+    },
+    "email": null,
+    "root": "/home/peter/\u4e0b\u8f7d/Head",
+    "host": "peter-G3-3590",
+    "username": "peter",
+    "executable": "/home/peter/anaconda3/envs/transformer/bin/python"
+}

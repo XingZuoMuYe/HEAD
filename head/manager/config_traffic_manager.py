@@ -39,7 +39,6 @@ class ConTrafficManager(BaseManager):
 
         self._traffic_vehicles = []
 
-        # triggered by the event. TODO(lqy) In the future, event trigger can be introduced
         self.block_triggered_vehicles = []
 
         # traffic property
@@ -98,7 +97,7 @@ class ConTrafficManager(BaseManager):
         return dict()
 
     # 这段代码是一个方法`before_step`的实现，用于处理交通车辆在每一步之前的一系列操作。具体解释如下：
-    # 1.获取当前引擎对象`engine`，以及当前模式`mode`。
+    # 1.获取当前引擎对象`renderer`，以及当前模式`mode`。
     # 2.如果当前模式不是`TrafficMode.Respawn`（不是重生模式），则遍历活动代理车辆。
     # 3.获取每个代理车辆的车道索引和对应的道路对象。
     # 4.如果有阻塞触发的车辆（`block_triggered_vehicles`列表不为空），则将最后一个阻塞车辆的车辆列表中的车辆加入到整体交通车辆列表中。
@@ -259,7 +258,7 @@ class ConTrafficManager(BaseManager):
             grid_choices = np.arange(20, 40, 8)
 
         LIMIT_SPEED = 40.0
-        if self.global_config['lane_num'] == 3:
+        if self.engine.global_config.map_config['lane_num'] == 3:
             grid_choices = np.arange(20, 40, 8)
             SPEED_DIFFERENCE = [15.0, 10.0, 18.75]
             long = self.VEHICLE_GAP * grid_choices / 3
@@ -268,14 +267,14 @@ class ConTrafficManager(BaseManager):
             long = self.VEHICLE_GAP * grid_choices / 4
 
         for long in long.tolist():
-            lane = self.respawn_lanes[np.random.choice(self.global_config['lane_num'])]
+            lane = self.respawn_lanes[np.random.choice(self.engine.global_config.map_config['lane_num'])]
             vehicle_type = self.random_vehicle_type()
             traffic_v_config = {"spawn_lane_index": lane.index, "spawn_longitude": long, "spawn_lateral": 0}
 
             # print(lane.index)
             traffic_v_config.update(self.engine.global_config["traffic_vehicle_config"])
             random_v = self.spawn_object(vehicle_type, vehicle_config=traffic_v_config)
-            from head.policy.idm_policy_include_pedestrian import IDMPolicyIncluedPedestrain
+            from head.policy.basic_policy.idm_policy_include_pedestrian import IDMPolicyIncluedPedestrain
             difference = float(np.random.choice(SPEED_DIFFERENCE, 1))
             # print(difference)
             IDMPolicyIncluedPedestrain.NORMAL_SPEED = LIMIT_SPEED*difference/100
@@ -471,7 +470,7 @@ class MixedPGTrafficManager(ConTrafficManager):
             from metadrive.policy.idm_policy import IDMPolicy
             from metadrive.policy.expert_policy import ExpertPolicy
             # print("===== We are initializing {} vehicles =====".format(len(selected)))
-            # print("Current seed: ", self.engine.global_random_seed)
+            # print("Current seed: ", self.renderer.global_random_seed)
             for v_config in selected:
                 vehicle_type = self.random_vehicle_type()
                 v_config.update(self.engine.global_config["traffic_vehicle_config"])
