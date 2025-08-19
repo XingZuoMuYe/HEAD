@@ -1,3 +1,5 @@
+import time
+
 from scipy.interpolate import splrep, splev
 import matplotlib.pyplot as plt
 
@@ -34,6 +36,19 @@ def rgb_normalize(color):
 
 
 def smooth_curve(waypoint, dis=0.2):
+    # 把一串离散路径点用样条插值成更平滑、等间距的轨迹，并计算航向角和曲率
+    if len(waypoint) < 4:
+        # print(f"[WARN] smooth_curve: too few points ({len(waypoint)}), using linear fallback.")
+        fx = waypoint[:, 0]
+        fy = waypoint[:, 1]
+        dx = np.diff(fx)
+        dy = np.diff(fy)
+        ftheta = np.arctan2(dy, dx)
+        ftheta = np.append(ftheta, ftheta[-1])
+        fdL = np.sqrt(dx ** 2 + dy ** 2)
+        fdL = np.append(fdL, fdL[-1])
+        fkappa = np.zeros_like(fx)
+        return [fx, fy, ftheta, fkappa]
     i = 1
     a = len(waypoint)
     index = []
@@ -51,7 +66,7 @@ def smooth_curve(waypoint, dis=0.2):
     s = np.concatenate(([0], np.cumsum(ds)))
 
     ss = np.arange(0, s[-1], dis)
-    xx = splev(ss, splrep(s, x))
+    xx = splev(ss, splrep(s, x))  # 先平滑再等间隔  # splrep(s, x)得样条系数，确定如何拟合
     yy = splev(ss, splrep(s, y))
 
     # 根据插值点计算ftheta和fkappa
@@ -75,7 +90,7 @@ def smooth_curve(waypoint, dis=0.2):
         fkappa[i] = (ftheta[i + 1] - ftheta[i]) / fdL[i]
 
     fkappa[num_fx - 1] = fkappa[num_fx - 2]
-    return [fx, fy, ftheta, fkappa]
+    return [fx, fy, ftheta, fkappa] # x,y,航向角 θ, 曲率 κ
 
 
 def convert_to_debug_plot(global_path, i):
@@ -279,20 +294,36 @@ def calc_distance(x1, y1, x2, y2):
 
 
 # calc initial s
+try:
+    from .local_planner.local_utils_cpp import (
+        calc_cur_s as _calc_cur_s_cpp,
+        calc_cur_d as _calc_cur_d_cpp,
+    )
+    print("C++ calc_cur_s / calc_cur_d")
+    _HAS_CPP = True
+except Exception as e:
+    print("Python fallback for calc_cur_s/calc_cur_d:", e)
+    _HAS_CPP = False
+
+
 def calc_cur_s(csp, ego_pose, index):
+    if _HAS_CPP:
+        # print("c++ _calc_cur_s_cpp")
+        return _calc_cur_s_cpp(csp, ego_pose, index)
     min_dist = np.inf
     min_index = 0
     increase_count = 0
     dist_tmp = np.inf
     dist_mux = []
+
     for i in range(index, len(csp.s)):
         global_x, global_y = calc_position(csp, csp.s[i])
-        dist = calc_distance(ego_pose.x, ego_pose.y, global_x, global_y)
+        dist = calc_distance(ego_pose.x, ego_pose.y, global_x, global_y)    # 离自车最近的csp点
         dist_mux.append(dist)
 
     min_index = dist_mux.index(min(dist_mux))
     s_match = csp.s[min_index]
-    yaw_match = calc_yaw(csp, s_match)
+    yaw_match = calc_yaw(csp, s_match)  # 航向角
     x_match, y_match = calc_position(csp, s_match)
 
     delta_x = ego_pose.x - x_match
@@ -336,6 +367,9 @@ def calc_cur_fpath_s(fpath, ego_pose, index):
 
 # calc lateral error
 def calc_cur_d(ego_pose, csp, cur_s):
+    if _HAS_CPP:
+        # print("c++ _calc_cur_d_cpp")
+        return _calc_cur_d_cpp(ego_pose, csp, cur_s)
     x_ref, y_ref = calc_position(csp, cur_s)
     yaw_ref = calc_yaw(csp, cur_s)
 
@@ -449,6 +483,8 @@ def calc_yaw(csp, s):
 
     return yaw
 
+    # x = calc(csp.sx, s)
+    # y = calc(csp.sy, s)
 
 # Spline function
 def calc(sp, t):
@@ -515,23 +551,32 @@ def calcddd(sp, t):
 
 
 def search_index(sp, x):
-    min_i, max_i = 0, len(sp.x) - 2  # 初始化 min_i 和 max_i，确保 max_i 不超过 len(sp.x) - 2
-    while min_i <= max_i:
-        mid_i = (min_i + max_i) // 2  # 计算中间索引
-        if x < sp.x[mid_i]:
-            max_i = mid_i - 1  # 更新最大索引
-        elif x > sp.x[mid_i]:
-            min_i = mid_i + 1  # 更新最小索引
-        else:
-            return mid_i  # 找到目标值，返回索引
+    min_i = 0
+    max_i = len(sp.x) - 2
+    index = -1  # 初始化为-1，表示未找到
+    count = 1.0  # 计数器，用于限制循环次数
+    mid_i = 0
 
-    # 未找到目标值，返回最接近的索引
-    if max_i < 0:  # 如果 x 小于所有值，返回第一个索引
+    if max_i == -1:
         return 0
-    if min_i >= len(sp.x) - 1:  # 如果 x 大于所有值，返回最后一个索引（不超过 len(sp.x) - 2）
-        return len(sp.x) - 2
-    # 返回 min_i 或 max_i 中更接近 x 的索引
-    return min_i if abs(sp.x[min_i] - x) < abs(sp.x[max_i] - x) else max_i
+    elif min_i == max_i:
+        return 0
+
+    # min_i = int(max(0, math.floor(x / 2) - 2))
+    # max_i = int(min(min_i + 5, max_i))
+
+    while min_i <= max_i and count <= len(sp.x):  # 添加循环退出条件
+        count += 1
+        mid_i = (min_i + max_i) // 2
+
+        if x < sp.x[mid_i]:
+            max_i = mid_i - 1  # 更新最大索引为 mid_i - 1
+        elif x > sp.x[mid_i]:
+            min_i = mid_i + 1  # 更新最小索引为 mid_i + 1
+        else:
+            break
+    index = mid_i
+    return index
 
 
 def euclidean_distance(v1, v2):
@@ -1022,3 +1067,20 @@ def solve_trinom(a, b, c):
         return (-b - np.sqrt(delta)) / (2 * a), (-b + np.sqrt(delta)) / (2 * a)
     else:
         return None, None
+
+
+def find_value_in_2DTable(x_table, y_table, x_value):
+    if len(x_table) != len(y_table):
+        print("x_table and y_table have different lengths")
+        return None
+
+    if x_value < x_table[0]:
+        return y_table[0]
+    elif x_value > x_table[-1]:
+        return y_table[-1]
+    else:
+        for i in range(len(x_table) - 1):
+            if x_table[i] <= x_value < x_table[i + 1]:
+                k = (y_table[i + 1] - y_table[i]) / (x_table[i + 1] - x_table[i])
+                y_value = y_table[i] + k * (x_value - x_table[i])
+                return y_value

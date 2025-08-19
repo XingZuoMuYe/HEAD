@@ -15,10 +15,12 @@ Ref:
 import numpy as np
 import copy
 import math
+
 from head.policy.evolvable_policy.common.local_planner import cubic_spline_planner
+# from head.policy.evolvable_policy.common.local_planner import cubic_spline_planner_cpp as cubic_spline_planner
+
 from head.policy.evolvable_policy.common.config import cfg
 from head.policy.evolvable_policy.common.utils import calc_cur_s, EGO_POSE
-
 
 def euclidean_distance(v1, v2):
     return math.sqrt(sum([(a - b) ** 2 for a, b in zip(v1, v2)]))
@@ -317,6 +319,26 @@ class FrenetPlanner:
         self.speed_radius = (max_speed - min_speed) / 2
         self.last_f_state = None
 
+        try:
+            from .local_utils_cpp import calc_global_paths as _c
+            print("c++ calc_global_paths")
+            self._calc_global_paths_cpp = _c  # ← 存到实例
+            self._HAS_CPP = True
+        except Exception as e:
+            print("use python fallback:", e)
+            self._calc_global_paths_cpp = None
+            self._HAS_CPP = False
+
+        try:
+            from .local_utils_cpp import generate_single_frenet_path as _gfp
+            print("c++ generate_single_frenet_path")
+            self._generate_single_frenet_path_cpp = _gfp
+            self._HAS_CPP_GFP = True
+        except Exception as e:
+            print("use python fallback for generate_single_frenet_path:", e)
+            self._generate_single_frenet_path_cpp = None
+            self._HAS_CPP_GFP = False
+
     def update_global_route(self, global_route):
         """
         fit an spline to the updated global route in inertial frame
@@ -327,7 +349,7 @@ class FrenetPlanner:
         wx = global_route[0]
         wy = global_route[1]
         wz = np.zeros_like(wx)
-        self.csp = cubic_spline_planner.Spline3D(wx, wy, wz)
+        self.csp = cubic_spline_planner.Spline3D(wx, wy, wz) # 离散点 → 连续函数
 
     def update_obstacles(self, ob):
         self.ob = ob
@@ -376,6 +398,16 @@ class FrenetPlanner:
         input: ego's current frenet state and terminal frenet values (lateral displacement, time of arrival, and speed)
         output: single frenet path
         """
+        if self._HAS_CPP_GFP and self._generate_single_frenet_path_cpp is not None:
+            return self._generate_single_frenet_path_cpp(
+                tuple(f_state),
+                dt=self.dt,
+                df=df,
+                Tf=Tf,
+                Vf=Vf,
+                csp=self.csp,
+            )
+
         s, s_d, s_dd, d, d_d, d_dd = f_state
 
         fp = Frenet_path()
@@ -466,6 +498,9 @@ class FrenetPlanner:
         input: path list
         output: path list
         """
+        if self._HAS_CPP and self._calc_global_paths_cpp is not None:
+            # print("c++ calc_global_paths def")
+            return self._calc_global_paths_cpp(fplist, self.csp)
         for fp in fplist:
 
             for i in range(len(fp.s)):
