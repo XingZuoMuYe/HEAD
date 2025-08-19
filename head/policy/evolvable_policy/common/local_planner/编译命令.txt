@@ -1,0 +1,6 @@
+# 在当前目录路径下
+# 安装pybind11
+# mkdir -p build && cd build
+# cmake -DCMAKE_BUILD_TYPE=Release ..
+# cmake --build . -j$(nproc)
+# 生成 local_utils_cpp.cpython-39-x86_64-linux-gnu.so
