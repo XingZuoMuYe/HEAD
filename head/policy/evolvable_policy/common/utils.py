@@ -293,7 +293,22 @@ def calc_distance(x1, y1, x2, y2):
 
 
 # calc initial s
+try:
+    from .local_planner.local_utils_cpp import (
+        calc_cur_s as _calc_cur_s_cpp,
+        calc_cur_d as _calc_cur_d_cpp,
+    )
+    print("C++ calc_cur_s / calc_cur_d")
+    _HAS_CPP = True
+except Exception as e:
+    print("Python fallback for calc_cur_s/calc_cur_d:", e)
+    _HAS_CPP = False
+
+
 def calc_cur_s(csp, ego_pose, index):
+    if _HAS_CPP:
+        # print("c++ _calc_cur_s_cpp")
+        return _calc_cur_s_cpp(csp, ego_pose, index)
     min_dist = np.inf
     min_index = 0
     increase_count = 0
@@ -302,12 +317,12 @@ def calc_cur_s(csp, ego_pose, index):
 
     for i in range(index, len(csp.s)):
         global_x, global_y = calc_position(csp, csp.s[i])
-        dist = calc_distance(ego_pose.x, ego_pose.y, global_x, global_y)
+        dist = calc_distance(ego_pose.x, ego_pose.y, global_x, global_y)    # 离自车最近的csp点
         dist_mux.append(dist)
 
     min_index = dist_mux.index(min(dist_mux))
     s_match = csp.s[min_index]
-    yaw_match = calc_yaw(csp, s_match)
+    yaw_match = calc_yaw(csp, s_match)  # 航向角
     x_match, y_match = calc_position(csp, s_match)
 
     delta_x = ego_pose.x - x_match
@@ -351,6 +366,9 @@ def calc_cur_fpath_s(fpath, ego_pose, index):
 
 # calc lateral error
 def calc_cur_d(ego_pose, csp, cur_s):
+    if _HAS_CPP:
+        # print("c++ _calc_cur_d_cpp")
+        return _calc_cur_d_cpp(ego_pose, csp, cur_s)
     x_ref, y_ref = calc_position(csp, cur_s)
     yaw_ref = calc_yaw(csp, cur_s)
 

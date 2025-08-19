@@ -17,7 +17,6 @@ import copy
 import math
 
 from head.policy.evolvable_policy.common.local_planner import cubic_spline_planner
-# from head.policy.evolvable_policy.common.local_planner import cubic_spline_planner_cpp as cubic_spline_planner
 
 from head.policy.evolvable_policy.common.config import cfg
 from head.policy.evolvable_policy.common.utils import calc_cur_s, EGO_POSE
@@ -349,7 +348,17 @@ class FrenetPlanner:
         wx = global_route[0]
         wy = global_route[1]
         wz = np.zeros_like(wx)
-        self.csp = cubic_spline_planner.Spline3D(wx, wy, wz) # 离散点 → 连续函数
+
+        try:
+            # 优先用 C++ 版（本模块名与 .so 一致）
+            from .local_utils_cpp import Spline3D as _Spline3D
+            print("C++ Spline3D in use")
+            self.csp = _Spline3D(wx, wy, wz)
+        except Exception as e:
+            # 回退 Python 版
+            print("Python Spline3D fallback:", e)
+            from .cubic_spline_planner import Spline3D as _Spline3D
+            self.csp = _Spline3D(wx, wy, wz)
 
     def update_obstacles(self, ob):
         self.ob = ob

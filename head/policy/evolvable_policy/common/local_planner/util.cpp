@@ -491,6 +491,172 @@ static Frenet_path generate_single_frenet_path_cpp(py::tuple f_state,
     return fp_done;
 }
 
+// ===== util.cpp 顶部（已有 include 之后）=====
+#include <numeric>
+#include <limits>
+#include <memory>
+
+/* ---------- 1D Cubic Spline == Python Spline_ ---------- */
+class Spline_ {
+public:
+    Spline_(const std::vector<double>& x, const std::vector<double>& y)
+        : nx_(x.size()), x_(x), a_(y), b_(nx_-1), c_(nx_), d_(nx_-1) {
+        computeCoefficients();
+    }
+
+    // 位置（与 Python 一致：区间外取端点值）
+    double calc(double t) const {
+        if (t < x_.front()) return a_.front();
+        if (t > x_.back())  return a_.back();
+        std::size_t i = segment(t);
+        double dx = t - x_[i];
+        // 连乘避免 pow
+        return (((d_[i]*dx + c_[i])*dx + b_[i])*dx + a_[i]);
+    }
+
+    // 一阶导（区间外取端点 b）
+    double calcd(double t) const {
+        if (t < x_.front()) return b_.front();
+        if (t > x_.back())  return b_.back();
+        std::size_t i = segment(t);
+        double dx = t - x_[i];
+        return (3.0*d_[i]*dx + 2.0*c_[i])*dx + b_[i];
+    }
+
+    // 二阶导（区间外：返回 NaN，由 pybind 包装层转 None）
+    double calcdd_raw(double t) const {
+        if (t < x_.front() || t > x_.back()) return std::numeric_limits<double>::quiet_NaN();
+        std::size_t i = segment(t);
+        double dx = t - x_[i];
+        return 6.0*d_[i]*dx + 2.0*c_[i];
+    }
+
+    // 三阶导（区间外：返回 NaN，由 pybind 包装层转 None）
+    double calcddd_raw(double t) const {
+        if (t < x_.front() || t > x_.back()) return std::numeric_limits<double>::quiet_NaN();
+        return 6.0 * d_[segment(t)];
+    }
+
+    // 零拷贝视图所需
+    const std::vector<double>& x() const { return x_; }
+    const std::vector<double>& a() const { return a_; }
+    const std::vector<double>& b() const { return b_; }
+    const std::vector<double>& c() const { return c_; }
+    const std::vector<double>& d() const { return d_; }
+
+private:
+    std::size_t nx_;
+    std::vector<double> x_, a_, b_, c_, d_;
+
+    // 等价 np.searchsorted(...,'left')-1 并 clamp 到 [0,nx_-2]
+    std::size_t segment(double t) const {
+        auto pos = std::lower_bound(x_.begin(), x_.end(), t) - x_.begin();
+        if (pos == 0) return 0;
+        std::size_t idx = pos - 1;
+        return (idx > nx_-2) ? (nx_-2) : idx;
+    }
+
+    void computeCoefficients() {
+        std::vector<double> h(nx_-1);
+        for (std::size_t i=0;i<nx_-1;++i) h[i] = x_[i+1]-x_[i];
+
+        // A c = B  （完全按 Python 版构造）
+        Eigen::MatrixXd A = Eigen::MatrixXd::Zero(nx_, nx_);
+        A(0,0) = 1.0; A(nx_-1,nx_-1) = 1.0;
+        for (std::size_t i=0; i<nx_-2; ++i) {
+            A(i+1,i)   = h[i];
+            A(i+1,i+1) = 2.0*(h[i]+h[i+1]);
+            A(i,i+1)   = h[i];
+        }
+        Eigen::VectorXd B = Eigen::VectorXd::Zero(nx_);
+        for (std::size_t i=1;i<nx_-1;++i) {
+            B(i) = 3.0*(a_[i+1]-a_[i])  / h[i]
+                 - 3.0*(a_[i]  -a_[i-1])/ h[i-1];
+        }
+
+        Eigen::VectorXd c_eig = A.ldlt().solve(B);
+        for (std::size_t i=0;i<nx_;++i) c_[i] = c_eig(i);
+
+        for (std::size_t i=0;i<nx_-1;++i) {
+            d_[i] = (c_[i+1]-c_[i])/(3.0*h[i]);
+            b_[i] = (a_[i+1]-a_[i])/h[i] - h[i]*(c_[i+1]+2.0*c_[i])/3.0;
+        }
+    }
+};
+
+/* ---------- 3D Cubic Spline == Python Spline3D ---------- */
+class Spline3D {
+public:
+    Spline3D(const std::vector<double>& x,
+             const std::vector<double>& y,
+             const std::vector<double>& z)
+    {
+        const std::size_t n = x.size();
+        s_.reserve(n);
+        s_.push_back(0.0);
+        for (std::size_t i=1;i<n;++i) {
+            const double ds = std::sqrt((x[i]-x[i-1])*(x[i]-x[i-1])
+                                       +(y[i]-y[i-1])*(y[i]-y[i-1])
+                                       +(z[i]-z[i-1])*(z[i]-z[i-1]));
+            s_.push_back(s_.back()+ds);
+        }
+        sx_ = std::make_unique<Spline_>(s_, x);
+        sy_ = std::make_unique<Spline_>(s_, y);
+        sz_ = std::make_unique<Spline_>(s_, z);
+    }
+
+    std::tuple<double,double,double> calc_position(double s) const {
+        return { sx_->calc(s), sy_->calc(s), sz_->calc(s) };
+    }
+
+    // 与你的 Python（delta+atan）完全一致
+    double calc_yaw(double s) const {
+        double dx = sx_->calcd(s);
+        double dy = sy_->calcd(s);
+        double delta = 0.0;
+        if (dx <= 0.0) {
+            if (dy <= 0.0) { dx = -dx; dy = -dy; delta = -M_PI; }
+            else           { delta =  M_PI; }
+        }
+        return std::atan(dy/dx) + delta;
+    }
+
+    // 按 Python 3D 版本（分母一阶）对齐
+    double calc_curvature(double s) const {
+        const double dx  = sx_->calcd(s);
+        const double dy  = sy_->calcd(s);
+        const double ddx = sx_->calcdd_raw(s);
+        const double ddy = sy_->calcdd_raw(s);
+        return (ddy*dx - ddx*dy) / (dx*dx + dy*dy);
+    }
+
+    double calc_pitch(double s) const {
+        const double dx = sx_->calcd(s);
+        const double dz = sz_->calcd(s);
+        return std::atan2(dz, dx);
+    }
+
+    // 暴露零拷贝、嵌套求值
+    const std::vector<double>& s() const { return s_; }
+    Spline_& sx() const { return *sx_; }
+    Spline_& sy() const { return *sy_; }
+    Spline_& sz() const { return *sz_; }
+
+private:
+    std::vector<double> s_;
+    std::unique_ptr<Spline_> sx_, sy_, sz_;
+};
+
+// ---- helper：把 std::vector<double> 暴露为零拷贝 np.ndarray，并绑定 base 以延长生命周期
+auto vec_to_np = [](std::vector<double>& v, py::object base) {
+    return py::array_t<double>(
+        { static_cast<py::ssize_t>(v.size()) },       // shape
+        { static_cast<py::ssize_t>(sizeof(double)) }, // stride
+        v.data(),
+        base
+    );
+};
+
 PYBIND11_MODULE(local_utils_cpp, m) {
     m.doc() = "calc_cur_s / calc_cur_d (C++ core; consuming Python csp/ego via NumPy views)";
 
@@ -546,5 +712,54 @@ PYBIND11_MODULE(local_utils_cpp, m) {
         py::arg("csp"),
         "Generate one Frenet_path with (s,s_d,s_dd,d,d_d,d_dd), time step dt, "
         "target df/Tf/Vf, and map to global using csp (Spline3D-like: sx/sy/sz).");
+
+    // ---------- Spline_ ----------
+    py::class_<Spline_>(m, "Spline_")
+    .def(py::init<const std::vector<double>&, const std::vector<double>&>())
+    .def("calc",  &Spline_::calc)
+    .def("calcd", &Spline_::calcd)
+    // 越界行为：返回 None（内部 NaN → None）
+    .def("calcdd", [](Spline_& s, double t)->py::object {
+        double v = s.calcdd_raw(t);
+        if (std::isnan(v)) return py::none();
+        return py::float_(v);
+    })
+    .def("calcddd", [](Spline_& s, double t)->py::object {
+        double v = s.calcddd_raw(t);
+        if (std::isnan(v)) return py::none();
+        return py::float_(v);
+    })
+    // 零拷贝属性（与 SpBufs 路径一致）
+    .def_property_readonly("x_np", [](Spline_& s){ return vec_to_np(const_cast<std::vector<double>&>(s.x()), py::cast(&s)); })
+    .def_property_readonly("a_np", [](Spline_& s){ return vec_to_np(const_cast<std::vector<double>&>(s.a()), py::cast(&s)); })
+    .def_property_readonly("b_np", [](Spline_& s){ return vec_to_np(const_cast<std::vector<double>&>(s.b()), py::cast(&s)); })
+    .def_property_readonly("c_np", [](Spline_& s){ return vec_to_np(const_cast<std::vector<double>&>(s.c()), py::cast(&s)); })
+    .def_property_readonly("d_np", [](Spline_& s){ return vec_to_np(const_cast<std::vector<double>&>(s.d()), py::cast(&s)); })
+    // 兼容回退：也提供 Python list 版
+    .def_property_readonly("x", [](Spline_& s){ return py::cast(s.x()); })
+    .def_property_readonly("a", [](Spline_& s){ return py::cast(s.a()); })
+    .def_property_readonly("b", [](Spline_& s){ return py::cast(s.b()); })
+    .def_property_readonly("c", [](Spline_& s){ return py::cast(s.c()); })
+    .def_property_readonly("d", [](Spline_& s){ return py::cast(s.d()); });
+
+    // ---------- Spline3D ----------
+    py::class_<Spline3D>(m, "Spline3D")
+    .def(py::init<const std::vector<double>&, const std::vector<double>&, const std::vector<double>&>())
+    .def("calc_position", &Spline3D::calc_position)
+    .def("calc_yaw",      &Spline3D::calc_yaw)
+    .def("calc_curvature",&Spline3D::calc_curvature)
+    .def("calc_pitch",    &Spline3D::calc_pitch)
+    .def_property_readonly("s_np", [](Spline3D& sp){
+        auto &s = const_cast<std::vector<double>&>(sp.s());
+        return vec_to_np(s, py::cast(&sp));
+    })
+    .def_property_readonly("s", [](Spline3D& sp){ return py::cast(sp.s()); })
+    // 让 sx/sy/sz 在 Python 侧继续当对象用；生命周期绑定到 Spline3D
+    .def_property_readonly("sx", [](Spline3D& sp)->Spline_& { return sp.sx(); },
+                           py::return_value_policy::reference_internal)
+    .def_property_readonly("sy", [](Spline3D& sp)->Spline_& { return sp.sy(); },
+                           py::return_value_policy::reference_internal)
+    .def_property_readonly("sz", [](Spline3D& sp)->Spline_& { return sp.sz(); },
+                           py::return_value_policy::reference_internal);
 }
 

@@ -308,7 +308,7 @@ except Exception as e:
 
 def calc_cur_s(csp, ego_pose, index):
     if _HAS_CPP:
-        # print("c++ _calc_cur_s_cpp")
+        print("c++ _calc_cur_s_cpp")
         return _calc_cur_s_cpp(csp, ego_pose, index)
     min_dist = np.inf
     min_index = 0

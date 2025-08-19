@@ -1,4 +1,4 @@
-# 在当前目录路径下
+# 在当前目录路径下：cd ~/PycharmProjects/HEAD/head/policy/evolvable_policy/common/local_planner
 # 安装pybind11
 # mkdir -p build && cd build
 # cmake -DCMAKE_BUILD_TYPE=Release ..
