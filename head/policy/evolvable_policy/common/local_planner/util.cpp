@@ -6,6 +6,8 @@
 #include <cmath>
 #include <algorithm>
 #include <tuple>
+#include <pybind11/eigen.h>
+#include <stdexcept>
 
 namespace py = pybind11;
 
@@ -657,6 +659,83 @@ auto vec_to_np = [](std::vector<double>& v, py::object base) {
     );
 };
 
+// ========= 逐点：StraightLane.position =========
+// 返回 shape=(2,) 的 np.ndarray
+static py::array_t<double> straight_lane_position(
+    const Eigen::Ref<const Eigen::Vector2d>& start,
+    const Eigen::Ref<const Eigen::Vector2d>& dir,
+    const Eigen::Ref<const Eigen::Vector2d>& dir_lat,
+    double longitudinal,
+    double lateral
+){
+    Eigen::Vector2d p = start + longitudinal * dir + lateral * dir_lat;
+    // 直接构造 1D 向量数组（无拷贝问题，返回时复制到 numpy 管理的内存）
+    py::array_t<double> out({2});
+    auto m = out.mutable_unchecked<1>();
+    m(0) = p.x();
+    m(1) = p.y();
+    return out;
+}
+
+// ========= 批量：给一组 s（长坐标），返回 (N,2) =========
+static py::array_t<double> straight_lane_positions(
+    const Eigen::Ref<const Eigen::Vector2d>& start,
+    const Eigen::Ref<const Eigen::Vector2d>& dir,
+    const Eigen::Ref<const Eigen::Vector2d>& dir_lat,
+    py::array_t<double, py::array::c_style | py::array::forcecast> s,  // 1D
+    double lateral
+){
+    if (s.ndim() != 1) throw std::runtime_error("s must be 1D array");
+    const auto N = static_cast<py::ssize_t>(s.shape(0));
+    py::array_t<double> out({N, (py::ssize_t)2});
+    auto ss = s.unchecked<1>();
+    auto M  = out.mutable_unchecked<2>();
+
+    const Eigen::Vector2d lat = lateral * dir_lat;
+
+    {
+        py::gil_scoped_release rel;        // 释放 GIL，加速循环
+        for (py::ssize_t i=0;i<N;++i) {
+            const double si = ss(i);
+            const Eigen::Vector2d p = start + si * dir + lat;
+            M(i,0) = p.x();
+            M(i,1) = p.y();
+        }
+    }
+    return out;
+}
+
+// ========= “折线”：等间距采样 get_polyline（包含终点） =========
+static py::array_t<double> straight_lane_polyline(
+    const Eigen::Ref<const Eigen::Vector2d>& start,
+    const Eigen::Ref<const Eigen::Vector2d>& dir,
+    const Eigen::Ref<const Eigen::Vector2d>& dir_lat,
+    double length,
+    double interval = 2.0,
+    double lateral = 0.0
+){
+    if (length < 0.0)     throw std::runtime_error("length < 0");
+    if (interval <= 0.0)  throw std::runtime_error("interval <= 0");
+
+    const std::size_t N = static_cast<std::size_t>(std::ceil(length / interval)) + 1; // 含末端
+
+    py::array_t<double> out({ (py::ssize_t)N, (py::ssize_t)2 });
+    auto M = out.mutable_unchecked<2>();
+    const Eigen::Vector2d lat = lateral * dir_lat;
+
+    {
+        py::gil_scoped_release rel;
+        double s = 0.0;
+        for (std::size_t i=0;i<N;++i, s += interval) {
+            if (s > length) s = length;    // 最后一点对齐终点
+            const Eigen::Vector2d p = start + s * dir + lat;
+            M(i,0) = p.x();
+            M(i,1) = p.y();
+        }
+    }
+    return out;
+}
+
 PYBIND11_MODULE(local_utils_cpp, m) {
     m.doc() = "calc_cur_s / calc_cur_d (C++ core; consuming Python csp/ego via NumPy views)";
 
@@ -761,5 +840,20 @@ PYBIND11_MODULE(local_utils_cpp, m) {
                            py::return_value_policy::reference_internal)
     .def_property_readonly("sz", [](Spline3D& sp)->Spline_& { return sp.sz(); },
                            py::return_value_policy::reference_internal);
+
+    m.def("straight_lane_position",  &straight_lane_position,
+      py::arg("start"), py::arg("direction"), py::arg("direction_lateral"),
+      py::arg("longitudinal"), py::arg("lateral"),
+      "Return start + s*direction + lateral*direction_lateral (shape=(2,)).");
+
+    m.def("straight_lane_positions", &straight_lane_positions,
+      py::arg("start"), py::arg("direction"), py::arg("direction_lateral"),
+      py::arg("s"), py::arg("lateral") = 0.0,
+      "Batch: positions for an array of s (shape=(N,2)).");
+
+    m.def("straight_lane_polyline",  &straight_lane_polyline,
+      py::arg("start"), py::arg("direction"), py::arg("direction_lateral"),
+      py::arg("length"), py::arg("interval") = 2.0, py::arg("lateral") = 0.0,
+      "Polyline sampling along the lane (shape=(N,2), includes end point).");
 }
 

@@ -124,7 +124,7 @@ class SACConfig:
         self.model_save_path = path_dict["model_save_path"]
         self.log_save_path = path_dict["log_save_path"]
         self.eval_save_path = path_dict["eval_save_path"]
-        self.train_eps = 1000000
+        self.train_eps = 200 # 1000000
         self.eps_max_steps = 2000
         self.eval_eps = 100000
         self.total_steps = getattr(args, 'total_steps', 1e8)

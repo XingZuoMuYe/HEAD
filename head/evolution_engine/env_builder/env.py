@@ -79,7 +79,7 @@ class EnvConfig:
                 self.common_config.pop(key, None)  # 第二个参数 None 避免 KeyError
             self.common_config['data_directory'] = cfg.args.database_path
             self.common_config.update({
-                "num_scenarios": 492,
+                # "num_scenarios": 492,
                 "reactive_traffic": True
             })
 

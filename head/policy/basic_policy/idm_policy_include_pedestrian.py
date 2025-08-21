@@ -6,6 +6,76 @@ from metadrive.policy.base_policy import BasePolicy
 from metadrive.policy.manual_control_policy import ManualControlPolicy
 from metadrive.utils.math import not_zero, wrap_to_pi, norm
 
+# ====== C++ 加速 StraightLane.position / get_polyline ======
+# try:
+#     # 1) 载入你编译好的 pybind11 扩展（路径按你的工程来；若不同请改成你的模块路径）
+#     from head.policy.evolvable_policy.common.local_planner import local_utils_cpp as _cu
+#     # 2) 引入库内 StraightLane 类
+#     from metadrive.component.lane.straight_lane import StraightLane
+#
+#     # 防止重复补丁
+#     if not getattr(StraightLane, "_fast_geom_patched", False):
+#
+#         # C++ 版 position：start + s * dir + lateral * dir_lat
+#         def _fast_position(self, longitudinal: float, lateral: float):
+#             return _cu.straight_lane_position(
+#                 np.asarray(self.start, dtype=np.float64),
+#                 np.asarray(self.direction, dtype=np.float64),
+#                 np.asarray(self.direction_lateral, dtype=np.float64),
+#                 float(longitudinal),
+#                 float(lateral),
+#             )
+#
+#         # C++ 版 get_polyline：等间距采样（包含终点）
+#         def _fast_get_polyline(self, interval: float = 2.0, lateral: float = 0.0):
+#             return _cu.straight_lane_polyline(
+#                 np.asarray(self.start, dtype=np.float64),
+#                 np.asarray(self.direction, dtype=np.float64),
+#                 np.asarray(self.direction_lateral, dtype=np.float64),
+#                 float(self.length),
+#                 float(interval),
+#                 float(lateral),
+#             )
+#
+#         # 打补丁
+#         StraightLane.position = _fast_position
+#         StraightLane.get_polyline = _fast_get_polyline
+#         print("[fast lanes] StraightLane.position/get_polyline -> C++ accelerated")
+#
+#         # （可选）进一步加速 polygon（很多地方会间接用到 point_on_lane）
+#         # 原实现是双侧逐点调 position；这里用批量 C++ 一次生成两侧折线再拼接
+#         def _fast_polygon(self):
+#             if self._polygon is None:
+#                 longs = np.arange(
+#                     0.0,
+#                     self.length + self.POLYGON_SAMPLE_RATE,
+#                     self.POLYGON_SAMPLE_RATE,
+#                     dtype=np.float64,
+#                 )
+#                 right = _cu.straight_lane_positions(
+#                     np.asarray(self.start, dtype=np.float64),
+#                     np.asarray(self.direction, dtype=np.float64),
+#                     np.asarray(self.direction_lateral, dtype=np.float64),
+#                     longs,
+#                     +self.width_at(0) / 2.0,
+#                 )
+#                 left = _cu.straight_lane_positions(
+#                     np.asarray(self.start, dtype=np.float64),
+#                     np.asarray(self.direction, dtype=np.float64),
+#                     np.asarray(self.direction_lateral, dtype=np.float64),
+#                     longs[::-1],
+#                     -self.width_at(0) / 2.0,
+#                 )
+#                 self._polygon = np.vstack([right, left])
+#             return self._polygon
+#
+#         # 如果你也想加速 polygon，取消下一行注释即可
+#         # from types import MappingProxyType  # 不是必须，仅避免 IDE 报警
+#         # StraightLane.polygon = property(_fast_polygon)
+#
+# except Exception as _e:
+#     print("[fast lanes] C++ accel not available:", _e)
+
 
 class FrontBackObjects:
     def __init__(self, front_ret, back_ret, front_dist, back_dist):
