@@ -1,3 +1,17 @@
 env_name: 'metadrive-v0'
 map_name: 'waymo'
-database_path: '/home/nie/metadrive/scenarionet/waymo_training_20/exp_converted'
+database_path: '/home/test/git_shuo/HEAD/head/datasets/waymo'
+env_name: "metadrive-v0"
+map_name: "geely"
+
+sub_task:
+  waymo:
+    data_directory: "/home/huang/Mount_Disk/CYX/HEAD-dev_cuiyx/head/datasets/waymo"
+
+
+  waymo_reactive:
+    data_directory: "/home/huang/Mount_Disk/CYX/HEAD-dev_cuiyx/head/datasets/waymo"
+    reactive_traffic: True
+
+  geely:
+    data_directory: "/home/huang/Mount_Disk/CYX/HEAD-dev_cuiyx/head/datasets/geely"
