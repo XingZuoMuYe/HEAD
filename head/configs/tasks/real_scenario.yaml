@@ -1,6 +1,3 @@
-env_name: 'metadrive-v0'
-map_name: 'waymo'
-database_path: '/home/test/git_shuo/HEAD/head/datasets/waymo'
 env_name: "metadrive-v0"
 map_name: "geely"
 
