@@ -23,6 +23,8 @@ wheels/
 share/python-wheels/
 *.egg-info/
 artifacts/logs
+artifacts/eval
+artifacts/models
 head/datasets
 .installed.cfg
 *.egg
