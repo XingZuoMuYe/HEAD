@@ -10,6 +10,8 @@ from functools import partial
 from head.renderer.head_renderer import HeadTopDownRenderer
 from head.manager.algorithm_selector import resolve_agent_policy
 from head.policy.evolvable_policy import poly_planning_policy
+from pathlib import Path
+
 
 # Disable deprecation warnings for now
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -22,6 +24,9 @@ class SeedGenerator:
         self.seed = int(time.time())
         return self.seed
 
+def get_project_root() -> Path:
+    curr_path = Path(__file__).resolve()
+    return curr_path.parent.parent.parent  # go up two levels
 
 class EnvConfig:
     def __init__(self, cfg):
@@ -77,14 +82,23 @@ class EnvConfig:
             # 清理与 ScenarioEnv 无关的键
             for key in ['random_spawn_lane_index', 'map_config', 'accident_prob', 'use_lateral_reward']:
                 self.common_config.pop(key, None)  # 第二个参数 None 避免 KeyError
-            map_name = cfg.args.map_name
-            sub_task_cfg = cfg.args.sub_task[map_name]
-            self.common_config.update(sub_task_cfg)
-            self.common_config['data_directory'] = sub_task_cfg['data_directory']
-            self.common_config['sub_task'] = map_name
+            dataset_name = cfg.args.dataset_name
+            dataset_candidates = cfg.args.dataset_candidates
+            all_candidates = dataset_candidates["official_datasets"] + dataset_candidates["custom_datasets"]
+            if dataset_name not in all_candidates:
+                raise ValueError(
+                    f"❌ Dataset '{dataset_name}' is not in the candidate list {all_candidates}. Please check your config!"
+                )
+            base_path = get_project_root()
+            data_directory = base_path / 'datasets' / dataset_name
+            self.common_config['dataset_name'] = dataset_name
+            self.common_config['data_directory'] = data_directory
+            self.common_config['reactive_traffic'] = cfg.args.reactive_traffic
+            self.common_config['dataset_candidates'] = cfg.args.dataset_candidates
+            self.common_config['adversarial'] = cfg.args.adversarial
+
             self.common_config.update({
                 "num_scenarios": 3,
-                "reactive_traffic": True
             })
 
     def create_env(self, seed):
@@ -96,7 +110,7 @@ class EnvConfig:
             env = StraightConfTraffic(config)
 
         elif self.cfg.args.task in ['muti_scenario-v0', 'single_scenario-v0']:
-            env =  MultiScenario(config)
+            env = MultiScenario(config)
 
         elif self.cfg.args.task in ['real_scenario-v0']:
             env = RealScenarioEnv(config)

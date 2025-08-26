@@ -320,21 +320,21 @@ class FrenetPlanner:
 
         try:
             from .local_utils_cpp import calc_global_paths as _c
-            print("c++ calc_global_paths")
+            # print("c++ calc_global_paths")
             self._calc_global_paths_cpp = _c  # ← 存到实例
             self._HAS_CPP = True
         except Exception as e:
-            print("use python fallback:", e)
+            # print("use python fallback:", e)
             self._calc_global_paths_cpp = None
             self._HAS_CPP = False
 
         try:
             from .local_utils_cpp import generate_single_frenet_path as _gfp
-            print("c++ generate_single_frenet_path")
+            # print("c++ generate_single_frenet_path")
             self._generate_single_frenet_path_cpp = _gfp
             self._HAS_CPP_GFP = True
         except Exception as e:
-            print("use python fallback for generate_single_frenet_path:", e)
+            # print("use python fallback for generate_single_frenet_path:", e)
             self._generate_single_frenet_path_cpp = None
             self._HAS_CPP_GFP = False
 
@@ -352,11 +352,11 @@ class FrenetPlanner:
         try:
             # 优先用 C++ 版（本模块名与 .so 一致）
             from .local_utils_cpp import Spline3D as _Spline3D
-            print("C++ Spline3D in use")
+            # print("C++ Spline3D in use")
             self.csp = _Spline3D(wx, wy, wz)
         except Exception as e:
             # 回退 Python 版
-            print("Python Spline3D fallback:", e)
+            # print("Python Spline3D fallback:", e)
             from .cubic_spline_planner import Spline3D as _Spline3D
             self.csp = _Spline3D(wx, wy, wz)
 

@@ -18,14 +18,14 @@ from metadrive.utils.math import wrap_to_pi
 
 from metadrive.manager.scenario_map_manager import ScenarioMapManager
 from metadrive.manager.scenario_light_manager import ScenarioLightManager
-from head.component.map.scenario_map_manager import TwodimScenarioMapManager
-from head.component.map.traffic_cone_manager import TrafficConeManager
+from head.component.map.custom_map_manager import CustomMapManager
+from head.component.map.custom_light_manager import CustomLightManager
 # from head.manager.config_traffic_manager import GenTrafficManager
 
-from head.component.navigation.trajectory_navigation import OsmTrajectoryNavigation
+# from head.component.navigation.trajectory_navigation import OsmTrajectoryNavigation
 from metadrive.component.navigation_module.trajectory_navigation import TrajectoryNavigation
 from head.manager.bev_img_manager.bev_img_manager import BEVRenderer
-
+from metadrive.utils import Config
 
 
 class RealScenarioEnv(ScenarioEnv):
@@ -33,7 +33,9 @@ class RealScenarioEnv(ScenarioEnv):
     def default_config(cls):
         config = super(RealScenarioEnv, cls).default_config()
         config.update(dict(
-            sub_task=None,
+            dataset_name=None,
+            dataset_candidates=None,
+            adversarial=None,
             render_bev=True,
             frame_skip=5,
             frame_stack=3,
@@ -51,18 +53,21 @@ class RealScenarioEnv(ScenarioEnv):
         self.head_renderer = None
         self.bev_renderer = None  # BEV渲染器实例
         self._bev_initialized = False  # 标记BEV是否已初始化
-        self.sub_task = config.get("sub_task", None)
-
+        self.dataset_name = config.get("dataset_name", None)
+        self.dataset_candidates = config.get("dataset_candidates", {})
+        self.official_datasets = self.dataset_candidates.get("official_datasets", [])
+        self.custom_datasets = self.dataset_candidates.get("custom_datasets", [])
+        self.adv = config.get("adversarial", None)
 
     def _post_process_config(self, config):
-        """根据 sub_task 动态修改 config"""
+        """根据 dataset_name 动态修改 config"""
         config = super(RealScenarioEnv, self)._post_process_config(config)
-        if config.get("sub_task", None) == "geely":
+        if config.get("dataset_name") in config.get("dataset_candidates", {}).get("custom_datasets", []):
             config.update(dict(
                 map_region_size=2048,
                 # even_sample_vehicle_class=True,  deprecated
                 vehicle_config=dict(
-                    navigation_module= TrajectoryNavigation,
+                    navigation_module= TrajectoryNavigation,    # todo：待改为OsmTrajectoryNavigation
                     lidar=dict(num_lasers=240, distance=50),
                     side_detector=dict(num_lasers=0, distance=50),
                     lane_line_detector=dict(num_lasers=0, distance=20),
@@ -124,19 +129,28 @@ class RealScenarioEnv(ScenarioEnv):
     def setup_engine(self):
         super(ScenarioEnv, self).setup_engine()
         self.engine.register_manager("data_manager", ScenarioDataManager())
-        self.sub_task = '6'
-        if self.sub_task == "geely":
-            self.engine.register_manager("map_manager", TwodimScenarioMapManager())
-            if not self.config["no_light"]:
-                self.engine.register_manager("light_manager", TrafficConeManager())
-            if not self.config["no_traffic"]:
-                self.engine.register_manager("traffic_manager", ScenarioTrafficManager())   # GenTrafficManager
-        else:
+        # 判断数据集属于官方还是自建
+        if self.dataset_name in self.official_datasets:
             self.engine.register_manager("map_manager", ScenarioMapManager())
             if not self.config["no_light"]:
                 self.engine.register_manager("light_manager", ScenarioLightManager())
             if not self.config["no_traffic"]:
-                self.engine.register_manager("traffic_manager", ScenarioTrafficManager())
+                if self.adv:
+                    self.engine.register_manager("traffic_manager", ScenarioTrafficManager())  # AdvTrafficManager
+                else:
+                    self.engine.register_manager("traffic_manager", ScenarioTrafficManager())  # NaturalTrafficManager
+
+        elif self.dataset_name in self.custom_datasets:
+            self.engine.register_manager("map_manager", CustomMapManager())
+            if not self.config["no_light"]:
+                self.engine.register_manager("light_manager", CustomLightManager())
+            if not self.config["no_traffic"]:
+                if self.adv:
+                    self.engine.register_manager("traffic_manager", ScenarioTrafficManager())  # AdvTrafficManager
+                else:
+                    self.engine.register_manager("traffic_manager", ScenarioTrafficManager())  # NaturalTrafficManager
+        else:
+            print("No valid dataset!!!")
 
         self.engine.register_manager("curriculum_manager", ScenarioCurriculumManager())
 
@@ -149,7 +163,7 @@ class RealScenarioEnv(ScenarioEnv):
         lateral_now = vehicle.navigation.current_lateral
 
         # ===== Geely 修改奖励 =====
-        if self.sub_task == "geely":
+        if self.dataset_name == "geely":
             # 改1：用 lateral_factor 而不是线性 penalty
             if vehicle.lane in vehicle.navigation.current_ref_lanes:
                 positive_road = 1

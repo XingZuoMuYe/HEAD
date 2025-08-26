@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.10)
 project(local_utils_cpp LANGUAGES CXX)
 
 find_package(pybind11 CONFIG REQUIRED)

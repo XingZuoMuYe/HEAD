@@ -1,14 +1,14 @@
 env_name: "metadrive-v0"
-map_name: "geely"
+map_name: "real"
 
-sub_task:
-  waymo:
-    data_directory: "/home/huang/Mount_Disk/CYX/HEAD-dev_cuiyx/head/datasets/waymo"
+dataset_candidates:
+  official_datasets:
+    - waymo
+    - nuscenes
+    - nuplan
+  custom_datasets:
+    - geely
 
-
-  waymo_reactive:
-    data_directory: "/home/huang/Mount_Disk/CYX/HEAD-dev_cuiyx/head/datasets/waymo"
-    reactive_traffic: True
-
-  geely:
-    data_directory: "/home/huang/Mount_Disk/CYX/HEAD-dev_cuiyx/head/datasets/geely"
+dataset_name: "geely"
+reactive_traffic: False
+adversarial: False
