@@ -131,16 +131,15 @@ class RealScenarioEnv(ScenarioEnv):
         self.engine.register_manager("data_manager", ScenarioDataManager())
         # 判断数据集属于官方还是自建
         if self.dataset_name in self.official_datasets:
+            # 官方数据集
             self.engine.register_manager("map_manager", ScenarioMapManager())
             if not self.config["no_light"]:
                 self.engine.register_manager("light_manager", ScenarioLightManager())
             if not self.config["no_traffic"]:
-                if self.adv:
-                    self.engine.register_manager("traffic_manager", ScenarioTrafficManager())  # AdvTrafficManager
-                else:
-                    self.engine.register_manager("traffic_manager", ScenarioTrafficManager())  # NaturalTrafficManager
+                self.engine.register_manager("traffic_manager", ScenarioTrafficManager())
 
         elif self.dataset_name in self.custom_datasets:
+            # 自建数据集
             self.engine.register_manager("map_manager", CustomMapManager())
             if not self.config["no_light"]:
                 self.engine.register_manager("light_manager", CustomLightManager())
@@ -151,6 +150,7 @@ class RealScenarioEnv(ScenarioEnv):
                     self.engine.register_manager("traffic_manager", ScenarioTrafficManager())  # NaturalTrafficManager
         else:
             print("No valid dataset!!!")
+            raise ValueError(f"❌ Unknown dataset: {self.dataset_name}")
 
         self.engine.register_manager("curriculum_manager", ScenarioCurriculumManager())
 

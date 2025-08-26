@@ -490,7 +490,7 @@ class MixedPGTrafficManager(ConTrafficManager):
         self.block_triggered_vehicles.reverse()
 
 from metadrive.engine.logger import get_logger
-from head.policy.basic_policy.custom_idm_policy import MyPolicy
+from head.policy.basic_policy.idm_policy_with_osm import MyPolicy
 
 
 logger = get_logger()
@@ -953,7 +953,7 @@ class NaturalTrafficManager(BaseManager):
         self.np_random.shuffle(potential_vehicle_configs)
         selected = potential_vehicle_configs[:min(total_vehicles, len(potential_vehicle_configs))]
         selected = [{'spawn_lane_index': '232091', 'spawn_longitude': 0, 'enable_reverse': False}]
-        from head.policy.basic_policy.custom_idm_policy import MyEgoPolicy
+        from head.policy.basic_policy.idm_policy_with_osm import MyEgoPolicy
 
         # print("===== We are initializing {} vehicles =====".format(len(selected)))
         # print("Current seed: ", self.engine.global_random_seed)
