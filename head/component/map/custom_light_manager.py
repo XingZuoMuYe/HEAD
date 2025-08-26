@@ -11,7 +11,7 @@ from metadrive.component.static_object.traffic_object import TrafficCone
 logger = logging.getLogger(__file__)
 
 
-class TrafficConeManager(BaseManager):
+class CustomLightManager(BaseManager):
     """
     Modified ScenarioLightManager
 
@@ -27,7 +27,7 @@ class TrafficConeManager(BaseManager):
     OBJECT_PREFIX = "traffic_light_"
 
     def __init__(self):
-        super(TrafficConeManager, self).__init__()
+        super(CustomLightManager, self).__init__()
         self._scenario_id_to_obj_id = {}
         self._obj_id_to_scenario_id = {}
         self._lane_index_to_obj = {}
@@ -35,7 +35,7 @@ class TrafficConeManager(BaseManager):
         self._episode_light_data = None
 
     def before_reset(self):
-        super(TrafficConeManager, self).before_reset()
+        super(CustomLightManager, self).before_reset()
         self._scenario_id_to_obj_id = {}
         self._lane_index_to_obj = {}
         self._obj_id_to_scenario_id = {}

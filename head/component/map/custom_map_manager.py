@@ -5,7 +5,7 @@ import copy
 from metadrive.manager.scenario_map_manager import ScenarioMapManager
 
 
-class TwodimScenarioMapManager(ScenarioMapManager):
+class CustomMapManager(ScenarioMapManager):
     """
     Modified ScenarioMapManager
 
@@ -18,7 +18,7 @@ class TwodimScenarioMapManager(ScenarioMapManager):
     """
 
     def __init__(self):
-        super(TwodimScenarioMapManager, self).__init__()
+        super(CustomMapManager, self).__init__()
 
     def update_route(self):
         """
