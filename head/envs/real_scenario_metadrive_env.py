@@ -60,7 +60,7 @@ class RealScenarioEnv(ScenarioEnv):
         self.adv = config.get("adversarial", None)
 
     def _post_process_config(self, config):
-        """根据 dataset_name 动态修改 config"""
+        """根据 dataset_name 动态修改 configs"""
         config = super(RealScenarioEnv, self)._post_process_config(config)
         if config.get("dataset_name") in config.get("dataset_candidates", {}).get("custom_datasets", []):
             config.update(dict(
@@ -149,8 +149,8 @@ class RealScenarioEnv(ScenarioEnv):
                 else:
                     self.engine.register_manager("traffic_manager", ScenarioTrafficManager())  # NaturalTrafficManager
         else:
-            print("No valid dataset!!!")
-            raise ValueError(f"❌ Unknown dataset: {self.dataset_name}")
+            print("No valid datasets!!!")
+            raise ValueError(f"❌ Unknown datasets: {self.dataset_name}")
 
         self.engine.register_manager("curriculum_manager", ScenarioCurriculumManager())
 

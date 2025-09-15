@@ -4,7 +4,7 @@ from omegaconf import OmegaConf
 
 
 def parse_cfg(cfg_path) -> OmegaConf:
-	"""Parses a config file and returns an OmegaConf object."""
+	"""Parses a configs file and returns an OmegaConf object."""
 	base = OmegaConf.load(cfg_path / 'default.yaml')
 	cli = OmegaConf.from_cli()
 	for k,v in cli.items():
@@ -12,7 +12,7 @@ def parse_cfg(cfg_path) -> OmegaConf:
 			cli[k] = True
 	base.merge_with(cli)
 
-	# Modality config
+	# Modality configs
 	if cli.get('modality', base.modality) not in {'state', 'pixels'}:
 		raise ValueError('Invalid modality: {}'.format(cli.get('modality', base.modality)))
 	modality = cli.get('modality', base.modality)
@@ -20,7 +20,7 @@ def parse_cfg(cfg_path) -> OmegaConf:
 		mode = OmegaConf.load(cfg_path / f'{modality}.yaml')
 		base.merge_with(mode, cli)
 
-	# Task config
+	# Task configs
 	try:
 		domain, task = base.task.split('-', 1)
 	except:

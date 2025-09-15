@@ -50,7 +50,7 @@ class EnvConfig:
                 "type": 'block_sequence',
                 "exit_length": 50,
                 'lane_num': cfg.args.training.lane_num,
-                'config': cfg.args.map_name,
+                'configs': cfg.args.map_name,
                 "start_position": [0, 0],
             },
         }
@@ -58,7 +58,7 @@ class EnvConfig:
         self._apply_custom_config(cfg)
 
     def _apply_custom_config(self, cfg):
-        """Apply the custom settings provided in the config."""
+        """Apply the custom settings provided in the configs."""
         if 'straight_config_traffic-v0' in cfg.args.task:
             self.common_config.update({
                 'driving_reward': 3.5,
@@ -87,7 +87,7 @@ class EnvConfig:
             all_candidates = dataset_candidates["official_datasets"] + dataset_candidates["custom_datasets"]
             if dataset_name not in all_candidates:
                 raise ValueError(
-                    f"❌ Dataset '{dataset_name}' is not in the candidate list {all_candidates}. Please check your config!"
+                    f"❌ Dataset '{dataset_name}' is not in the candidate list {all_candidates}. Please check your configs!"
                 )
             base_path = get_project_root()
             data_directory = base_path / 'datasets' / dataset_name
@@ -122,7 +122,7 @@ class EnvConfig:
         return env
 
 
-def make_env_sac(cfg):
+def make_env(cfg):
     print('Env is starting')
     seed_generator = SeedGenerator()
 

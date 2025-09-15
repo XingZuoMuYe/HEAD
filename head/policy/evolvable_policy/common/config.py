@@ -13,7 +13,7 @@ def log_config_to_file(cfg, pre='cfg', logger=None):
 
 
 def cfg_from_list(cfg_list, config):
-    """Set config keys via list (e.g., from command line)."""
+    """Set configs keys via list (e.g., from command line)."""
     from ast import literal_eval
     assert len(cfg_list) % 2 == 0
     for k, v in zip(cfg_list[0::2], cfg_list[1::2]):

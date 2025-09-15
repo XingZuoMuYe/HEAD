@@ -44,7 +44,7 @@ class CustomMapManager(ScenarioMapManager):
         self.sdc_start_point = copy.deepcopy(init_position)
         self.sdc_dest_point = copy.deepcopy(last_position)
 
-        # update agent config
+        # update agent configs
         self.engine.global_config.update(
             copy.deepcopy(
                 dict(

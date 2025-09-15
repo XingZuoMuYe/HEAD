@@ -23,6 +23,7 @@ HEAD is a holistic suite of evolutionary autonomous driving software, based on t
     pip install -r requirements.txt
    cd head
    pip install -e .
+   pip install git+https://github.com/metadriverse/scenarionet.git
     ```
    
 

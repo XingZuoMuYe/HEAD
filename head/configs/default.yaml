@@ -21,7 +21,8 @@ algorithm:
   evolutionary:
     use_evolutionary: True  # 是否进行算法进化
     algorithm_type:
-      main: Poly  # 待进化算法类型（如 Poly）
+      main: Zero  # 待进化算法类型（如 Poly）
+
 
       candidates:
         Poly
@@ -37,6 +38,14 @@ algorithm:
           - PPO
         DreamMethod:
           - HeadMethodInDream
+
+  imitation_learning:
+    algorithm_type:
+      main: wayformer  # 待进化算法类型（如 Poly）
+      candidates:
+        - wayformer
+        - MTR #todo
+        - autobot #todo
 
   # 部署算法配置
   deployment:

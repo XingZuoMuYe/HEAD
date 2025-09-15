@@ -10,7 +10,7 @@ import numpy as np
 from collections import deque
 import shutil
 from head.evolution_engine.RLBoost.SAC.logger import Logger
-from head.evolution_engine.env_builder.env import make_env_sac
+from head.evolution_engine.env_builder.env import make_env
 from pathlib import Path
 
 
@@ -195,7 +195,7 @@ class SAC_Learner:
         self.ep_len = 0
 
     def agent_initialize(self):
-        self.env = make_env_sac(self.SAC_cfg)
+        self.env = make_env(self.SAC_cfg)
         print('agent is initializing')
         action_dim = self.env.action_space.shape[0]
         state_dim = self.env.observation_space.shape[0]
@@ -206,7 +206,7 @@ class SAC_Learner:
 
     def generate_env(self):
         self.env.close()
-        self.env = make_env_sac(self.SAC_cfg)
+        self.env = make_env(self.SAC_cfg)
 
 
     def update_config(self, env_name):

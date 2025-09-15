@@ -29,7 +29,7 @@ class TerminationState:
 
 CONF_TRAFFIC_DEFAULT_CONFIG = dict(
     vehicle_config=dict(
-        # Vehicle model. Candidates: "s", "m", "l", "xl", "default". random_agent_model makes this config invalid
+        # Vehicle model. Candidates: "s", "m", "l", "xl", "default". random_agent_model makes this configs invalid
         vehicle_model="default",
         # If set to True, the vehicle can go backwards with throttle/brake < -1
         enable_reverse=True,
@@ -65,14 +65,14 @@ class StraightConfTraffic(MetaDriveEnv):
         super(StraightConfTraffic, self).__init__(config)
         self.head_renderer = None
 
-    # 这部分代码是一个类的初始化方法（`__init__`），其中传入了一个可选参数`config`。在初始化方法中，首先对类中的属性
+    # 这部分代码是一个类的初始化方法（`__init__`），其中传入了一个可选参数`configs`。在初始化方法中，首先对类中的属性
     # `default_config_copy`进行赋值操作：
     #
     # 1.`self.default_config_copy = Config(self.default_config(), unchangeable=True)`  这行代码创建了一个名为`
     # Config`的对象，并将其赋值给类的`default_config_copy`属性。在创建 `Config`对象时，传入了两个参数：第一个是调用
     # `self.default_config()`方法的返回值，这个方法返回默认的配置信息；第二个是一个布尔值`unchangeable = True`，用于标识这个配置信息是否可以被改变。
-    # 2. `super(SparseConfTraffic, self).__init__(config)`这行代码调用了父类（`SparseConfTraffic`的父类）的初始化方法，将传入的参数
-    # `config`传递给父类的初始化方法以完成对象的初始化工作。通过调用`super()`函数，可以实现在子类中对父类的方法进行调用。
+    # 2. `super(SparseConfTraffic, self).__init__(configs)`这行代码调用了父类（`SparseConfTraffic`的父类）的初始化方法，将传入的参数
+    # `configs`传递给父类的初始化方法以完成对象的初始化工作。通过调用`super()`函数，可以实现在子类中对父类的方法进行调用。
 
     def reset(self, *args, **kwargs):
         self.head_renderer = HeadTopDownRenderer(self)
@@ -256,7 +256,7 @@ class StraightConfTraffic(MetaDriveEnv):
         # 计算舒适度惩罚
         reward += (-0.05 * lat_diff * self.config["comfort_reward"])
 
-        # print("舒适度奖励：", -0.1 * (lat_diff + lon_diff) * self.config["comfort_reward"])
+        # print("舒适度奖励：", -0.1 * (lat_diff + lon_diff) * self.configs["comfort_reward"])
         # print("奖励：", reward)
         step_info["step_reward"] = reward
 

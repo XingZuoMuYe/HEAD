@@ -78,7 +78,7 @@ if __name__ == '__main__':
 
     base_path = get_project_root()
     raw_data_path = base_path / 'raw_data' / 'scenario_1'
-    dataset_path = base_path / 'dataset' / 'scenario_1'
+    dataset_path = base_path / 'datasets' / 'scenario_1'
 
     with open(dataset_path/ 'map_features.pkl', 'rb') as f:
         map_features = pkl.load(f)
@@ -130,7 +130,7 @@ if __name__ == '__main__':
                     "ts": np.arange(0, scenario_length/10, 0.1),
                     "metadrive_processed": False,
                     "sdc_id": "1",  # 主车为1，用于定位到主车
-                    "dataset": "test",
+                    "datasets": "test",
                     "scenario_id": "1",
                     "source_file": "",
                     "track_length": scenario_length,
