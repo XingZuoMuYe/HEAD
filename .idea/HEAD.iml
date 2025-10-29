@@ -4,7 +4,7 @@
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/head/datasets" />
     </content>
-    <orderEntry type="jdk" jdkName="str2" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="HEAD" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PackageRequirementsSettings">
