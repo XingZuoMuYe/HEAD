@@ -17,7 +17,6 @@ EVOLUTION_STRATEGY_MAPPING = {
     }
 }
 
-
 def resolve_evolution_strategy(cfg):
     """
     根据 selection_method.main / sub 选择对应策略类。

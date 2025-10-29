@@ -20,7 +20,7 @@ if __name__ == "__main__":
     map_name = 'Tongji_West'
     base_path = get_project_root()
     raw_data_path = base_path / 'raw_data'/ 'scenario_1'
-    dataset_path = base_path / 'datasets' / 'scenario_1'
+    dataset_path = base_path / 'dataset' / 'scenario_1'
     with open(raw_data_path / '_Obj_info_batch.csv', 'r') as file:
         reader = csv.reader(file)
         headers = next(reader)  # 读取标题行，获取所有列名

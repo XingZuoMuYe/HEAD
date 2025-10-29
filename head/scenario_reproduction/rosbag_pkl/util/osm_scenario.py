@@ -30,7 +30,7 @@ if __name__ == "__main__":
     map_name =  'Tongji_West'
     base_path = get_project_root()
     raw_data_path = base_path / 'raw_data' / 'scenario_1'
-    dataset_path = base_path / 'datasets' / 'scenario_1'
+    dataset_path = base_path / 'dataset' / 'scenario_1'
 
     converter_1 = GPS_to_Global()
     converter_2 = GNSS_Transform()  # 为解决右舵驾驶问题地图关于x轴镜像，Carla_Y取负

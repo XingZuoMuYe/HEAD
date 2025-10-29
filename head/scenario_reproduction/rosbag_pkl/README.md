@@ -17,5 +17,5 @@ data_convert.py为将rosbag文件转换为pkl文件的主要脚本。它读取ro
 
 5. **metadrive渲染命令**
 ```bash
-python -m scenarionet.sim -d /path_to_your scenario_reproduction/datasets --render 2D/3D
+python -m scenarionet.sim -d /path_to_your scenario_reproduction/dataset --render 2D/3D
 ```

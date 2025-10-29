@@ -34,7 +34,7 @@ def create_env(need_monitor=False):
                                        "type": 'block_sequence',
                                        "exit_length": 50,
                                        'lane_num': 4,
-                                       'configs': 'SSSSSSSSSSSSSSSS',
+                                       'config': 'SSSSSSSSSSSSSSSS',
                                        "start_position": [0, 0],
                                    },
                                    ))
@@ -68,7 +68,7 @@ def create_multi_scenario_env(need_monitor=False):
             "type":'block_sequence',
             "exit_length": 50,
             'lane_num': 3,
-            'configs': 'CCO',
+            'config': 'CCO',
             "start_position": [0, 0],
         },
     ))
@@ -125,13 +125,12 @@ if __name__ == "__main__":
             #     mode="topdown")
 
             # straight_env
-            if i % 10 == 0:  # 每 10 帧渲一次，减负载
-               env.head_renderer.render(
-                   screen_record=False,
-                   scaling=6,
-                   film_size=(6000, 400),
-                   show_plan_traj=True,
-                   mode="topdown")
+            env.head_renderer.render(
+                screen_record=False,
+                scaling=6,
+                film_size=(6000, 400),
+                show_plan_traj=True,
+                mode="topdown")
 
             t2 = time.time()
             # 打印每一步的时间消耗（可选）
