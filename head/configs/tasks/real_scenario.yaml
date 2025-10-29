@@ -9,6 +9,6 @@ dataset_candidates:
   custom_datasets:
     - geely
 
-dataset_name: "geely"
+dataset_name: "waymo"
 reactive_traffic: False
 adversarial: False

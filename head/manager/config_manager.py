@@ -6,6 +6,8 @@ Description: config_manager.py
 
 # config_manager.py
 
+import warnings
+warnings.filterwarnings("ignore", message="pkg_resources is deprecated")
 import argparse
 from pathlib import Path
 from head.evolution_engine.RLBoost.SAC.cfg import parse_cfg

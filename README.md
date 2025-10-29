@@ -24,10 +24,13 @@ HEAD is a holistic suite of evolutionary autonomous driving software, based on t
    cd head
    pip install -e .
     ```
-   
+3. **Install scenarionet**
 
-
-
+   ```bash
+   git clone https://github.com/metadriverse/scenarionet.git
+   cd scenarionet
+   pip install -e .
+   ```
 ## References
 
 If you use HEAD in your own work, please cite:
