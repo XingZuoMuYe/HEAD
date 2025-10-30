@@ -95,10 +95,56 @@ All assets and code are under the [Apache 2.0 license](./LICENSE) unless specifi
 
 ## 📁 Project Structure
 
-     ``` tree -L 6 -I '__pycache__|*.pyc|*.egg-info|venv' > structure.txt
-
+```text
+tree -L 6 -I '__pycache__|*.pyc|*.egg-info|venv' > structure.txt
+```
 
 ```text
+├.
+├── artifacts
+│   ├── eval
+│   │   └── RLBoost_SAC
+│   │       ├── muti_scenario
+│   │       │   └── XCO
+│   │       ├── real_scenario
+│   │       │   └── real
+│   │       ├── single_scenario
+│   │       │   ├── interaction
+│   │       │   └── roundabout
+│   │       └── straight_config_traffic
+│   │           └── straight_road
+│   ├── logs
+│   │   └── RLBoost_SAC
+│   │       ├── muti_scenario
+│   │       │   └── XCO
+│   │       │       └── wandb_info
+│   │       ├── real_scenario
+│   │       │   └── real
+│   │       │       └── wandb_info
+│   │       ├── single_scenario
+│   │       │   ├── interaction
+│   │       │   │   └── wandb_info
+│   │       │   └── roundabout
+│   │       │       └── wandb_info
+│   │       └── straight_config_traffic
+│   │           └── straight_road
+│   └── models
+│       └── RLBoost_SAC
+│           └── checkpoints
+│               ├── muti_scenario
+│               │   └── XCO
+│               ├── real_scenario
+│               │   ├── geely
+│               │   ├── real
+│               │   └── waymo
+│               ├── single_scenario
+│               │   ├── circle_road
+│               │   ├── inRamp
+│               │   ├── interaction
+│               │   └── roundabout
+│               └── straight_config_traffic
+│                   ├── straight_road
+│                   └── straight_road_no_pedestrian
 ├── assets
 │   ├── closed_loop_structure.jpg
 │   ├── experiment_2.jpg
@@ -106,18 +152,30 @@ All assets and code are under the [Apache 2.0 license](./LICENSE) unless specifi
 │   ├── HEAD-icon.jpg
 │   ├── HEAD.jpg
 │   └── HEAD-structure.png
+├── debug
+│   └── head_debug.py
+├── geely
 ├── head
+│   ├── component
+│   │   ├── map
+│   │   │   ├── custom_light_manager.py
+│   │   │   ├── custom_map_manager.py
+│   │   │   └── lane_utils.py
+│   │   └── navigation
+│   │       └── custom_navigation.py
 │   ├── configs
 │   │   ├── default.yaml
 │   │   └── tasks
 │   │       ├── default.yaml
 │   │       ├── muti_scenario.yaml
+│   │       ├── real_scenario.yaml
 │   │       ├── single_scenario.yaml
 │   │       └── straight_config_traffic.yaml
 │   ├── envs
 │   │   ├── config_traffic_metadrive_env.py
 │   │   ├── __init__.py
-│   │   └── multi_scenario_metadrive_env.py
+│   │   ├── multi_scenario_metadrive_env.py
+│   │   └── real_scenario_metadrive_env.py
 │   ├── evolution_engine
 │   │   ├── common
 │   │   │   ├── __init__.py
@@ -142,15 +200,19 @@ All assets and code are under the [Apache 2.0 license](./LICENSE) unless specifi
 │   │           └── SAC_learner.py
 │   ├── __init__.py
 │   ├── manager
-│   │   ├── algorithm_selector.py
+│   │   ├── base_algorithm_selector.py
+│   │   ├── bev_img_manager
+│   │   │   └── bev_img_manager.py
 │   │   ├── config_manager.py
 │   │   ├── config_pedestrain_manager.py
 │   │   ├── config_traffic_manager.py
+│   │   ├── evolution_engine.py
 │   │   ├── evolution_selector.py
 │   │   └── __init__.py
 │   ├── policy
 │   │   ├── basic_policy
 │   │   │   ├── idm_policy_include_pedestrian.py
+│   │   │   ├── idm_policy_with_osm.py
 │   │   │   └── __init__.py
 │   │   ├── evolvable_policy
 │   │   │   ├── common
@@ -159,11 +221,14 @@ All assets and code are under the [Apache 2.0 license](./LICENSE) unless specifi
 │   │   │   │   ├── config.py
 │   │   │   │   ├── __init__.py
 │   │   │   │   ├── local_planner
+│   │   │   │   │   ├── 编译命令.txt
+│   │   │   │   │   ├── CMakeLists.txt
 │   │   │   │   │   ├── cubic_spline_planner.py
 │   │   │   │   │   ├── frenet_optimal_trajectory.py
 │   │   │   │   │   ├── __init__.py
 │   │   │   │   │   ├── setup.py
-│   │   │   │   │   └── spline_utils.pyx
+│   │   │   │   │   ├── spline_utils.pyx
+│   │   │   │   │   └── util.cpp
 │   │   │   │   ├── low_level_controller
 │   │   │   │   │   ├── controller.py
 │   │   │   │   │   └── __init__.py
@@ -175,22 +240,49 @@ All assets and code are under the [Apache 2.0 license](./LICENSE) unless specifi
 │   │   │   ├── __init__.py
 │   │   │   └── poly_planning_policy.py
 │   │   └── __init__.py
-│   └── renderer
-│       ├── head_renderer.py
-│       └── top_down_renderer.py
+│   ├── pyproject.toml
+│   ├── renderer
+│   │   ├── head_renderer.py
+│   │   └── top_down_renderer.py
+│   ├── scenario_datasets
+│   │   ├── geely.zip
+│   │   └── waymo.zip
+│   ├── scenario_reproduction
+│   │   ├── __init__.py
+│   │   └── rosbag_pkl
+│   │       ├── data_convert.py
+│   │       ├── __init__.py
+│   │       ├── README.md
+│   │       └── util
+│   │           ├── dataset_summary.py
+│   │           ├── GNSS_info_process.py
+│   │           ├── GNSS_Transform.py
+│   │           ├── __init__.py
+│   │           ├── obj_info.py
+│   │           ├── osm_scenario.py
+│   │           └── raw_data
+│   │               ├── scenario_1
+│   │               ├── scenario_2
+│   │               ├── scenario_3
+│   │               ├── scenario_4
+│   │               └── scenario_5
+│   └── scripts
+│       ├── __init__.py
+│       └── main_head.py
 ├── LICENSE
 ├── README.md
 ├── requirements.txt
-├── scripts
-│   └── main_head.py
+├── start_train.sh
 ├── structure.txt
-└── tests
-    ├── drive_in_real_env.py
-    ├── env_render_plot.py
-    ├── map.jpg
-    └── run_env.py
+├── tests
+│   ├── drive_in_real_env.py
+│   ├── env_render_plot.py
+│   ├── map.jpg
+│   └── run_env.py
+└── waymo
 
-22 directories, 68 files
+83 directories, 96 files
+
 ```
 
 
