@@ -31,6 +31,12 @@ HEAD is a holistic suite of evolutionary autonomous driving software, based on t
    cd scenarionet
    pip install -e .
    ```
+4. **Extract scenario datasets**
+
+   ```bash
+   unzip head/scenario_datasets/geely.zip -d head/scenario_datasets/geely/
+   unzip head/scenario_datasets/waymo.zip -d head/scenario_datasets/waymo/
+
 ## References
 
 If you use HEAD in your own work, please cite:
