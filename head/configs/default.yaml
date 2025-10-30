@@ -3,9 +3,9 @@ task_list:
   - muti_scenario-v0
   - straight_config_traffic-v0
   - single_scenario-v0
-  - real_scenario-v0
+  - real_scenario-v0 # Poly在 real_scenario下暂无部署模式
 
-task: single_scenario-v0
+task: straight_config_traffic-v0
 modality: state
 
 # training
@@ -17,20 +17,19 @@ training:
 
 # 算法具体配置
 algorithm:
-  # 进化算法配置（用于训练和进化策略）
+  mode: deployment  # 可选：evolutionary / deployment，用于明确启用哪类算法
+
+  # --- 进化算法配置（用于训练和进化策略） ---
   evolutionary:
-    use_evolutionary: True  # 是否进行算法进化
-    algorithm_type:
-      main: Poly  # 待进化算法类型（如 Poly）
-
+    base_algorithm_type:
+      main: Poly
       candidates:
-        Poly
-        Zero
+        - Poly
+        - Zero
 
-    selection_method: # 选择方法（如 RLBoost --> SAC）
+    evolution_method_type:
       main: RLBoost
       sub: SAC
-
       candidates:
         RLBoost:
           - SAC
@@ -38,10 +37,12 @@ algorithm:
         DreamMethod:
           - HeadMethodInDream
 
-  # 部署算法配置
   deployment:
-    use_deployment: False  # 是否进行部署
-    deployment_method: 'IDM'  # 部署方法（如 'IDM' 等）
+    deployment_method:
+      main: Poly
+      candidates:
+        - IDM
+        - Poly
 
 # misc
 misc:

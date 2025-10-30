@@ -8,7 +8,7 @@ Description: main_head.py
 
 from head.manager.config_manager import get_final_config
 from head.manager.evolution_selector import resolve_evolution_strategy
-
+from head.manager.evolution_engine import evolution_engine
 
 if __name__ == '__main__':
     # 获取配置
@@ -22,10 +22,11 @@ if __name__ == '__main__':
 
     # 初始化策略内部组件（如 agent、环境等）
     evolution_algo.agent_initialize()
+    evolution_engine = evolution_engine(cfg)
+    evolution_engine.start(evolution_algo)
 
     # 根据训练标志执行训练或评估
     if bool(cfg.train_flag):
-        evolution_algo.train()
+        evolution_engine.train()
     else:
-        evolution_algo.load()
-        evolution_algo.eval()
+        evolution_engine.eval()

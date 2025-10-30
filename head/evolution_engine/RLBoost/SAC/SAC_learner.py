@@ -142,7 +142,10 @@ class SACConfig:
         self.AUTO_ENTROPY = True
         self.DETERMINISTIC = False
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.train_flag = getattr(args, 'train_flag', False)
+        if args.algorithm['mode']=='deployment':
+            self.train_flag = 0
+        elif args.algorithm['mode']=='evolutionary':
+            self.train_flag = 1
         self.args = args
         if args.training["use_vec_env"] and args.training["show_render_info"]:
             print("Warning: 'show_render_info' is set to False because 'use_vec_env' is True.")
@@ -199,6 +202,7 @@ class SAC_Learner:
         print('agent is initializing')
         action_dim = self.env.action_space.shape[0]
         state_dim = self.env.observation_space.shape[0]
+
 
         self.agent = SAC(state_dim, action_dim, self.SAC_cfg)
         print(self.SAC_cfg.algo + ' algorithm is starting')
@@ -260,7 +264,6 @@ class SAC_Learner:
             self.train_standalone_env()
 
     def eval(self):
-
         if self.SAC_cfg.args.training.use_vec_env:
             self.eval_vec_env()
         else:

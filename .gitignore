@@ -25,7 +25,6 @@ share/python-wheels/
 artifacts/logs
 artifacts/eval
 artifacts/models
-head/datasets
 .installed.cfg
 *.egg
 MANIFEST

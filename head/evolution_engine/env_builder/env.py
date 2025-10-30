@@ -8,7 +8,7 @@ import time
 from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
 from functools import partial
 from head.renderer.head_renderer import HeadTopDownRenderer
-from head.manager.algorithm_selector import resolve_agent_policy
+from head.manager.base_algorithm_selector import resolve_agent_policy
 from head.policy.evolvable_policy import poly_planning_policy
 from pathlib import Path
 
@@ -90,7 +90,7 @@ class EnvConfig:
                     f"❌ Dataset '{dataset_name}' is not in the candidate list {all_candidates}. Please check your config!"
                 )
             base_path = get_project_root()
-            data_directory = base_path / 'datasets' / dataset_name
+            data_directory = base_path / 'scenario_datasets' / dataset_name
             self.common_config['dataset_name'] = dataset_name
             self.common_config['data_directory'] = data_directory
             self.common_config['reactive_traffic'] = cfg.args.reactive_traffic

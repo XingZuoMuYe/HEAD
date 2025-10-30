@@ -5,10 +5,10 @@ dataset_candidates:
   official_datasets:
     - waymo
     - nuscenes
-    - nuplan
+    - nuplan # todo
   custom_datasets:
     - geely
 
-dataset_name: "waymo"
+dataset_name: "geely"
 reactive_traffic: False
 adversarial: False
