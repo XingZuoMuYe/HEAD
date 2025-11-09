@@ -18,9 +18,10 @@ HEAD is a holistic suite of evolutionary autonomous driving software, based on t
    ```
 2. **Conda Env Settings and Install Dependencies**
     ``` bash
-    conda create -n HEAD python=3.9
-    conda activate HEAD
-    pip install -r requirements.txt
+   pip install uv 
+   uv venv create --python 3.9 head
+    source HEAD/bin/activate
+    uv pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
    cd head
    pip install -e .
     ```
@@ -37,6 +38,21 @@ HEAD is a holistic suite of evolutionary autonomous driving software, based on t
    unzip head/scenario_datasets/geely.zip -d head/scenario_datasets/geely/
    unzip head/scenario_datasets/waymo.zip -d head/scenario_datasets/waymo/
 
+5. **Build the `local_utils_cpp` module (for C++ accelerate)**
+
+    ```bash
+    # Go to the local planner module
+    cd ~/HEAD/head/policy/evolvable_policy/common/local_planner
+    # Install dependencies (pybind11, cmake, etc.)
+    sudo apt update
+    sudo apt install pybind11-dev
+    # Create a new build directory
+    mkdir -p build && cd build
+    # Configure with CMake (Release mode recommended)
+    cmake -DCMAKE_BUILD_TYPE=Release ..
+    # Compile using all available cores
+    cmake --build . -j$(nproc)
+   
 ## References
 
 If you use HEAD in your own work, please cite:

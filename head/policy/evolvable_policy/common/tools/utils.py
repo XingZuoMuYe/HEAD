@@ -299,10 +299,9 @@ try:
         calc_cur_s as _calc_cur_s_cpp,
         calc_cur_d as _calc_cur_d_cpp,
     )
-    print("C++ calc_cur_s / calc_cur_d")
+    print("C++ accelerate")
     _HAS_CPP = True
 except Exception as e:
-    print("Python fallback for calc_cur_s/calc_cur_d:", e)
     _HAS_CPP = False
 
 
