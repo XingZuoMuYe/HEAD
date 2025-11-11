@@ -5,7 +5,7 @@ task_list:
   - single_scenario-v0
   - real_scenario-v0 # Poly在 real_scenario下暂无部署模式
 
-task: straight_config_traffic-v0
+task: real_scenario-v0
 modality: state
 
 # training
@@ -17,7 +17,7 @@ training:
 
 # 算法具体配置
 algorithm:
-  mode: deployment  # 可选：evolutionary / deployment，用于明确启用哪类算法
+  mode: deployment  # 可选：evolutionary / deployment /imitation ，用于明确启用哪类算法
 
   # --- 进化算法配置（用于训练和进化策略） ---
   evolutionary:
@@ -37,18 +37,49 @@ algorithm:
         DreamMethod:
           - HeadMethodInDream
 
+  # ---------------- Deployment Configuration ----------------
   deployment:
     deployment_method:
-      main: Poly
+      main: imitation    # 当前部署方法，可选 IDM / Poly / imitation
       candidates:
         - IDM
         - Poly
+        - imitation
+
+     # 具体配置项
+    config:
+      # --- IDM 部署 ---
+      IDM:
+        type: rule_based
+        description: Intelligent Driver Model baseline
+
+      # --- Poly 部署 ---
+      Poly:
+        type: learned_policy
+        description: Polynomial-based policy model
+
+      # --- Imitation Learning 部署 ---
+      imitation:
+        type: imitation_learning
+        description: Imitation learning policy deployment
+        model:
+          main: wayformer
+          candidates:
+            - wayformer
+            - MTR
+            - autobot
+          pretrained_path: /home/test/git_shuo/HEAD/head/policy/imitation_policy/checkpoints/brier_fde=1.45.ckpt
+        dataset:
+          source: /datasets/
+          preprocessing: standardize
+
+
 
 # misc
 misc:
   seed: 10  # 随机种子
   eval_freq: 100000  # 评估频率（每多少步评估一次）
-  eval_episodes: 1  # 每次评估的 episode 数量
+  eval_episodes: 30  # 每次评估的 episode 数量
   save_video: True  # 是否保存视频
 
 # environment-specific settings

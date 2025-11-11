@@ -10,6 +10,7 @@ from head.manager.config_manager import get_final_config
 from head.manager.evolution_selector import resolve_evolution_strategy
 
 
+
 if __name__ == '__main__':
     # 获取配置
     cfg = get_final_config()

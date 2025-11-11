@@ -9,6 +9,7 @@ from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
 from functools import partial
 from head.renderer.head_renderer import HeadTopDownRenderer
 from head.manager.base_algorithm_selector import resolve_agent_policy
+from head.manager.imitation_selector import resolve_imitation_strategy
 from head.policy.evolvable_policy import poly_planning_policy
 from pathlib import Path
 
@@ -31,7 +32,6 @@ def get_project_root() -> Path:
 class EnvConfig:
     def __init__(self, cfg):
         self.cfg = cfg
-
         self.agent_policy = resolve_agent_policy(cfg)
         self.common_config = {
             'agent_policy': self.agent_policy,
@@ -118,11 +118,13 @@ class EnvConfig:
         else:
             print('No task configured.')
             return None
+        
         env.reset()
+
         return env
 
 
-def make_env_sac(cfg):
+def make_env(cfg):
     print('Env is starting')
     seed_generator = SeedGenerator()
 

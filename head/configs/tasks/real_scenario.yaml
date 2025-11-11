@@ -4,11 +4,11 @@ map_name: "real"
 dataset_candidates:
   official_datasets:
     - waymo
-    - nuscenes
+    - nuscenes #todo
     - nuplan # todo
   custom_datasets:
     - geely
 
-dataset_name: "geely"
+dataset_name: "waymo"
 reactive_traffic: False
 adversarial: False

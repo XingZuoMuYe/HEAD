@@ -19,26 +19,41 @@ HEAD is a holistic suite of evolutionary autonomous driving software, based on t
 2. **Conda Env Settings and Install Dependencies**
     ``` bash
    pip install uv 
-   uv venv create --python 3.9 head
-    source HEAD/bin/activate
-    uv pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+   uv venv --python 3.9 HEAD
+   source HEAD/bin/activate
+   uv pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
    cd head
    pip install -e .
     ```
-3. **Install scenarionet**
-
+3. **After setting up the base environment, install PyTorch and compatible deep
+learning libraries. Make sure your CUDA version matches (e.g., CUDA 12.1).**
+    ``` bash
+    uv pip install torch==2.5.0+cu121 torchvision torchaudio \
+    --index-url https://download.pytorch.org/whl/cu121
+    
+    # Install NATTEN (Neighborhood Attention)
+    uv pip install natten==0.21.1+torch280cu126 -f https://whl.natten.org
+    
+    # Install PyTorch Geometric dependencies
+    uv pip install torch-scatter -f https://data.pyg.org/whl/torch-2.5.0+cu121.html
+    uv pip install torch-cluster -f https://data.pyg.org/whl/torch-2.5.0+cu121.html
+    
+    # Install Waymo Open Dataset (TensorFlow version)
+    uv pip install waymo-open-dataset-tf-2-12-0 --extra-index-url https://pypi.org/simple
+    ```
+4. **Install scenarionet**
    ```bash
    git clone https://github.com/metadriverse/scenarionet.git
    cd scenarionet
-   pip install -e .
+   uv pip install -e .
    ```
-4. **Extract scenario datasets**
+5. **Extract scenario datasets**
 
    ```bash
    unzip head/scenario_datasets/geely.zip -d head/scenario_datasets/geely/
    unzip head/scenario_datasets/waymo.zip -d head/scenario_datasets/waymo/
 
-5. **Build the `local_utils_cpp` module (for C++ accelerate)**
+6. **Build the `local_utils_cpp` module (for C++ accelerate)**
 
     ```bash
     # Go to the local planner module
@@ -52,7 +67,18 @@ HEAD is a holistic suite of evolutionary autonomous driving software, based on t
     cmake -DCMAKE_BUILD_TYPE=Release ..
     # Compile using all available cores
     cmake --build . -j$(nproc)
-   
+
+7. **Install Unitraj and Create a symbolic link to the policy module in the `/head/policy/imitation_policy/` directory:**
+
+    ```bash
+    ln -s /path/to//UniTraj .
+
+uv pip install torch==2.5.0+cu121 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+uv pip install natten==0.21.1+torch280cu126 -f https://whl.natten.org
+uv pip install torch-scatter -f https://data.pyg.org/whl/torch-2.5.0+cu121.html
+uv pip install torch-cluster -f https://data.pyg.org/whl/torch-2.5.0+cu121.html
+uv pip install waymo-open-dataset-tf-2-12-0 --extra-index-url https://pypi.org/simple
+
 ## References
 
 If you use HEAD in your own work, please cite:
@@ -70,12 +96,23 @@ If you use HEAD in your own work, please cite:
 
 
 
+
 ## Acknowledgements
 
-Github:[GitHub - metadriverse/metadrive: MetaDrive: Open-source driving simulator](https://github.com/metadriverse/metadrive)
+This project integrates and builds upon the following excellent open-source works:
 
-Website:[MetaDrive | MetaDriverse](https://metadriverse.github.io//metadrive/)
+- MetaDrive Simulation:
+  - GitHub: https://github.com/metadriverse/metadrive
+  - Website: https://metadriverse.github.io/metadrive/
 
+- ScenarioNet:
+  - GitHub: https://github.com/metadriverse/scenarionet
+
+- UniTraj (Unified Trajectory Forecasting Framework):
+  - GitHub: https://github.com/vita-epfl/UniTraj
+  - Paper: https://arxiv.org/abs/2403.15098
+
+We gratefully acknowledge their contributions to the autonomous driving and imitation learning communities.
 
 
 ``` text

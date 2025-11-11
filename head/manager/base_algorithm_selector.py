@@ -1,6 +1,7 @@
 from head.policy.evolvable_policy.poly_planning_policy import RLPlanningPolicy
 from metadrive.policy.env_input_policy import EnvInputPolicy
 from metadrive.policy.idm_policy import IDMPolicy
+from head.policy.imitation_policy.imitation_planning_policy import ImitationPlanningPolicy
 
 # 映射关系（可扩展）
 BASE_POLICY_MAPPING = {
@@ -11,6 +12,7 @@ BASE_POLICY_MAPPING = {
 DEPLOYMENT_POLICY_MAPPING = {
     'IDM': IDMPolicy,
     'Poly': RLPlanningPolicy,
+    'imitation': ImitationPlanningPolicy,
     # 更多可扩展项...
 }
 
