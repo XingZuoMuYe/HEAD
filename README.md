@@ -13,7 +13,7 @@ HEAD is a holistic suite of evolutionary autonomous driving software, based on t
 
    Start by cloning the HEAD repository to your local machine:
     ``` bash
-    git clone https://github.com/TJHuangteam/HEAD.git
+    git clone https://github.com/XingZuoMuYe/HEAD.git
     cd HEAD
    ```
 2. **Conda Env Settings and Install Dependencies**
