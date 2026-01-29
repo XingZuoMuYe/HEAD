@@ -73,11 +73,11 @@ learning libraries. Make sure your CUDA version matches (e.g., CUDA 12.1).**
     ```bash
     ln -s /path/to//UniTraj .
 
-uv pip install torch==2.5.0+cu121 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-uv pip install natten==0.21.1+torch280cu126 -f https://whl.natten.org
-uv pip install torch-scatter -f https://data.pyg.org/whl/torch-2.5.0+cu121.html
-uv pip install torch-cluster -f https://data.pyg.org/whl/torch-2.5.0+cu121.html
-uv pip install waymo-open-dataset-tf-2-12-0 --extra-index-url https://pypi.org/simple
+   uv pip install torch==2.5.0+cu121 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+   uv pip install natten==0.21.1+torch280cu126 -f https://whl.natten.org
+   uv pip install torch-scatter -f https://data.pyg.org/whl/torch-2.5.0+cu121.html
+   uv pip install torch-cluster -f https://data.pyg.org/whl/torch-2.5.0+cu121.html
+   uv pip install waymo-open-dataset-tf-2-12-0 --extra-index-url https://pypi.org/simple
 
 ## References
 
