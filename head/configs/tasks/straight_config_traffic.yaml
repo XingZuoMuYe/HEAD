@@ -1,4 +1,8 @@
-env_name: 'metadrive-v0'
-map_name: "SSSSSSSSSSSSSS"
-scenario_difficulty: 1
-use_pedestrian: True
+scenario:
+  environment: metadrive-v0
+  map: SSSSSSSSSSSSSS
+  difficulty: 1
+  pedestrians: true
+  kind: generated
+  capabilities:
+    closed_loop_imitation: false

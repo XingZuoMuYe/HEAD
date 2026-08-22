@@ -80,6 +80,11 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+
+# Local model weights
+head/policy/imitation_policy/checkpoints/*.ckpt
+head/scenario_datasets/waymo/
+head/scenario_datasets/geely/
 .idea
 # IPython
 profile_default/

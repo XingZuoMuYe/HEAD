@@ -1,14 +1,15 @@
-env_name: "metadrive-v0"
-map_name: "real"
-
-dataset_candidates:
-  official_datasets:
-    - waymo
-    - nuscenes #todo
-    - nuplan # todo
-  custom_datasets:
-    - geely
-
-dataset_name: "waymo"
-reactive_traffic: False
-adversarial: False
+scenario:
+  environment: metadrive-v0
+  map: real
+  kind: recorded
+  capabilities:
+    closed_loop_imitation: true
+  dataset:
+    name: waymo
+    supported:
+      official:
+        - waymo
+      custom:
+        - geely
+  reactive_traffic: false
+  adversarial: false

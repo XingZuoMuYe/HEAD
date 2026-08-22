@@ -2,9 +2,12 @@
 <module type="PYTHON_MODULE" version="4">
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/.conda-env" />
+      <excludeFolder url="file://$MODULE_DIR$/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/.venv-readme-check" />
       <excludeFolder url="file://$MODULE_DIR$/HEAD" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.9 virtualenv at ~/git_shuo/HEAD/HEAD" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="~/git_shuo/HEAD/.venv" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PackageRequirementsSettings">

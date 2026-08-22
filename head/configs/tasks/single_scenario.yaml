@@ -1,2 +1,6 @@
-env_name: 'metadrive-v0'
-map_name: 'X' # 地图名称 X, C, O, r
+scenario:
+  environment: metadrive-v0
+  map: X
+  kind: generated
+  capabilities:
+    closed_loop_imitation: false

@@ -1,16 +1,9 @@
 import warnings
 
-from metadrive.envs import ScenarioEnv
-from metadrive.envs import MetaDriveEnv
-
 from head.envs import StraightConfTraffic, MultiScenario, RealScenarioEnv
-import time
 from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
 from functools import partial
-from head.renderer.head_renderer import HeadTopDownRenderer
 from head.manager.base_algorithm_selector import resolve_agent_policy
-from head.manager.imitation_selector import resolve_imitation_strategy
-from head.policy.evolvable_policy import poly_planning_policy
 from pathlib import Path
 
 
@@ -18,12 +11,13 @@ from pathlib import Path
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 class SeedGenerator:
-    def __init__(self):
-        self.seed = 42
+    def __init__(self, seed):
+        self.seed = seed
 
     def next_seed(self):
-        self.seed = int(time.time())
-        return self.seed
+        current_seed = self.seed
+        self.seed += 1
+        return current_seed
 
 def get_project_root() -> Path:
     curr_path = Path(__file__).resolve()
@@ -33,6 +27,8 @@ class EnvConfig:
     def __init__(self, cfg):
         self.cfg = cfg
         self.agent_policy = resolve_agent_policy(cfg)
+        if hasattr(self.agent_policy, "configure"):
+            self.agent_policy.configure(cfg)
         self.common_config = {
             'agent_policy': self.agent_policy,
             'discrete_action': False,
@@ -49,8 +45,8 @@ class EnvConfig:
             'map_config': {
                 "type": 'block_sequence',
                 "exit_length": 50,
-                'lane_num': cfg.args.training.lane_num,
-                'config': cfg.args.map_name,
+                'lane_num': cfg.args.simulation.lane_count,
+                'config': cfg.args.scenario.map,
                 "start_position": [0, 0],
             },
         }
@@ -64,15 +60,15 @@ class EnvConfig:
                 'driving_reward': 3.5,
                 'speed_reward': 0.8,
                 'start_seed': None,  # Will be set later
-                'scenario_difficulty': cfg.args.scenario_difficulty,
-                'use_pedestrian': cfg.args.use_pedestrian,
+                'scenario_difficulty': cfg.args.scenario.difficulty,
+                'use_pedestrian': cfg.args.scenario.pedestrians,
                 'comfort_reward': 2.0,
                 'traffic_mode': "respawn",
             })
             self.common_config['horizon'] = 400
 
         # Override the horizon for MetaDrive or multi-scenario tasks
-        if 'muti_scenario' in cfg.args.task or 'single_scenario' in cfg.args.task:
+        if 'multi_scenario' in cfg.args.task or 'muti_scenario' in cfg.args.task or 'single_scenario' in cfg.args.task:
             self.common_config['horizon'] = 1200
             self.common_config['start_seed'] = 5
             self.common_config['random_traffic'] = True  # MetaDrive specific
@@ -82,9 +78,10 @@ class EnvConfig:
             # 清理与 ScenarioEnv 无关的键
             for key in ['random_spawn_lane_index', 'map_config', 'accident_prob', 'use_lateral_reward']:
                 self.common_config.pop(key, None)  # 第二个参数 None 避免 KeyError
-            dataset_name = cfg.args.dataset_name
-            dataset_candidates = cfg.args.dataset_candidates
-            all_candidates = dataset_candidates["official_datasets"] + dataset_candidates["custom_datasets"]
+            dataset_name = cfg.args.scenario.dataset.name
+            official_datasets = list(cfg.args.scenario.dataset.supported.official)
+            custom_datasets = list(cfg.args.scenario.dataset.supported.custom)
+            all_candidates = official_datasets + custom_datasets
             if dataset_name not in all_candidates:
                 raise ValueError(
                     f"❌ Dataset '{dataset_name}' is not in the candidate list {all_candidates}. Please check your config!"
@@ -93,9 +90,12 @@ class EnvConfig:
             data_directory = base_path / 'scenario_datasets' / dataset_name
             self.common_config['dataset_name'] = dataset_name
             self.common_config['data_directory'] = data_directory
-            self.common_config['reactive_traffic'] = cfg.args.reactive_traffic
-            self.common_config['dataset_candidates'] = cfg.args.dataset_candidates
-            self.common_config['adversarial'] = cfg.args.adversarial
+            self.common_config['reactive_traffic'] = cfg.args.scenario.reactive_traffic
+            self.common_config['dataset_candidates'] = {
+                'official_datasets': official_datasets,
+                'custom_datasets': custom_datasets,
+            }
+            self.common_config['adversarial'] = cfg.args.scenario.adversarial
 
             self.common_config.update({
                 "num_scenarios": 3,
@@ -109,7 +109,7 @@ class EnvConfig:
             config['start_seed'] = seed
             env = StraightConfTraffic(config)
 
-        elif self.cfg.args.task in ['muti_scenario-v0', 'single_scenario-v0']:
+        elif self.cfg.args.task in ['multi_scenario-v0', 'muti_scenario-v0', 'single_scenario-v0']:
             env = MultiScenario(config)
 
         elif self.cfg.args.task in ['real_scenario-v0']:
@@ -126,13 +126,13 @@ class EnvConfig:
 
 def make_env(cfg):
     print('Env is starting')
-    seed_generator = SeedGenerator()
+    seed_generator = SeedGenerator(cfg.args.runtime.seed)
 
     # Create a single environment or a vectorized environment
     env_config = EnvConfig(cfg)
-    if cfg.args.training.use_vec_env:
+    if cfg.args.simulation.vectorized:
         env = SubprocVecEnv(
-            [partial(env_config.create_env, seed_generator.next_seed()) for _ in range(cfg.args.training.env_num)])
+            [partial(env_config.create_env, seed_generator.next_seed()) for _ in range(cfg.args.simulation.num_envs)])
     else:
         env = env_config.create_env(seed_generator.next_seed())
 

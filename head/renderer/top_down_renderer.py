@@ -472,7 +472,15 @@ class TopDownRenderer:
         """
         绘制传入的轨迹。
         """
-        plan_traj = np.array([traj.x, traj.y])
+        # Planning policies may expose either the native FrenetPath object
+        # (with ``x``/``y`` fields) or a world-frame NumPy ``[T, 2]`` array.
+        if hasattr(traj, "x") and hasattr(traj, "y"):
+            plan_traj = np.array([traj.x, traj.y])
+        else:
+            array = np.asarray(traj)
+            if array.ndim != 2 or array.shape[1] < 2:
+                return
+            plan_traj = array[:, :2].T
         for i in range(plan_traj.shape[1]):
             pos = self._frame_canvas.pos2pix(plan_traj[0, i], plan_traj[1, i])
             radius = 4  # 调整圆的半径
@@ -481,11 +489,11 @@ class TopDownRenderer:
             color = (0, 0, 255)
             if color_set == 'rainbow':
                 color = (
-                    min(255, 255 - i * 5 + brightness_increase),
-                    min(255, 50 + i * 5 + brightness_increase),
-                    50 + brightness_increase
+                    int(np.clip(255 - i * 5 + brightness_increase, 0, 255)),
+                    int(np.clip(50 + i * 5 + brightness_increase, 0, 255)),
+                    int(np.clip(50 + brightness_increase, 0, 255)),
                 )
-            elif color == 'blue':
+            elif color_set == 'blue':
                 color = (255, 0, 0)
 
             pygame.draw.circle(

@@ -5,17 +5,23 @@
 """
 from datetime import datetime
 import os
+from pathlib import Path
 
 from head.evolution_engine.RLBoost.SAC.SAC_learner import SAC_Learner, SACConfig
 from head.evolution_engine.env_builder.env import make_env
+from head.manager.artifact_paths import has_poly_checkpoint
+from head.manager.closed_loop_metrics import ClosedLoopMetricsRecorder
 import torch
-from head.policy.imitation_policy.utils.inference_engine import UnitrajInference
-from head.policy.imitation_policy.utils import visualization
 
-SAVE_DIR = "/home/test/git_shuo/HEAD/head/policy/imitation_policy/figure"
+SAVE_DIR = Path(__file__).resolve().parent.parent / "policy" / "imitation_policy" / "figure"
 os.makedirs(SAVE_DIR, exist_ok=True)
 import os
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
+
+
+def _closed_loop_metrics_for(cfg):
+    """Create the common recorder for every environment evaluation."""
+    return ClosedLoopMetricsRecorder(cfg)
 
 
 # 策略映射表(可扩展)
@@ -53,11 +59,13 @@ class NoEvolutionStrategy:
     def __init__(self, cfg):
         self.cfg = cfg
         self.env = None
-        print("[信息] 当前部署方法不需要进化策略")
+        self.closed_loop_metrics = None
+        print("[信息] 当前部署基础策略不需要进化策略")
     
     def agent_initialize(self):
         """部署模式下初始化环境"""
         self.env = make_env(self.cfg)
+        self.closed_loop_metrics = _closed_loop_metrics_for(self.cfg)
         print('[信息] 环境已初始化')
     
     def train(self):
@@ -70,22 +78,29 @@ class NoEvolutionStrategy:
             print("[警告] 环境未初始化,请先调用agent_initialize()")
             return
         
-        print('[信息] 开始评估')
-        eval_eps = self.cfg.args.misc.eval_episodes if hasattr(self.cfg.args, 'misc') else 1
-        eps_max_steps = 2000
+        print('[信息] 开始闭环评测')
+        eval_eps = self.cfg.args.evaluation.episodes
+        eps_max_steps = self.cfg.args.evaluation.max_steps
         
         for i_ep in range(eval_eps):
             state, _ = self.env.reset()
+            if self.closed_loop_metrics is not None:
+                self.closed_loop_metrics.start_episode()
             ep_reward = 0.0
             ep_len = 0
             
             for i_step in range(eps_max_steps):
                 # 使用环境的agent进行决策
-                action = self.env.action_space.sample()
+                # The environment's configured policy (IDM/Poly/imitation)
+                # computes the action internally. Passing None avoids replacing
+                # that policy action with a random sample.
+                action = None
                 next_state, reward, done, termin, info = self.env.step(action)
+                if self.closed_loop_metrics is not None:
+                    self.closed_loop_metrics.step(info, next_state, i_step, self.env)
                 
                 # 渲染
-                if self.cfg.args.training.show_render_info:
+                if self.cfg.args.simulation.render:
                     self._render()
                 
                 state = next_state
@@ -93,10 +108,21 @@ class NoEvolutionStrategy:
                 ep_len += 1
                 
                 if done or termin:
-                    print(f"Episode:{i_ep + 1}/{eval_eps}, Reward:{ep_reward:.3f}, Length:{ep_len}")
                     break
+            if self.closed_loop_metrics is not None:
+                self.closed_loop_metrics.finish_episode(
+                    episode_index=i_ep + 1,
+                    reward=ep_reward,
+                    length=ep_len,
+                    env=self.env,
+                )
         
-        print('[信息] 评估完成')
+        print('[信息] 闭环评测完成')
+        if self.closed_loop_metrics is not None:
+            metrics_path = self.closed_loop_metrics.save()
+            if metrics_path is not None:
+                print(f"[信息] 闭环指标已保存: {metrics_path}")
+        self.env.close()
     
     def _render(self):
         """渲染环境"""
@@ -107,7 +133,7 @@ class NoEvolutionStrategy:
                             film_size=(6000, 400),
                             show_plan_traj=True,
                             )
-        elif self.cfg.args.task == 'muti_scenario-v0' or self.cfg.args.task == 'single_scenario-v0':
+        elif self.cfg.args.task in ['multi_scenario-v0', 'muti_scenario-v0', 'single_scenario-v0']:
             self.env.head_renderer.render(mode="topdown",
                             screen_record=False,
                             show_plan_traj=True,
@@ -140,19 +166,24 @@ class ImitationStrategy(NoEvolutionStrategy):
         self.model = None
         self.imitation_cfg = None
         self.inference_engine = None
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._UnitrajInference = None
+        self._visualization = None
+        requested_device = cfg.args.runtime.device
+        device = "cuda" if requested_device == "auto" and torch.cuda.is_available() else requested_device
+        if device == "auto":
+            device = "cpu"
+        elif device == "cuda" and not torch.cuda.is_available():
+            raise RuntimeError("runtime.device is 'cuda', but CUDA is not available")
+        self.device = torch.device(device)
         print("[信息] 初始化模仿学习策略")
 
     def agent_initialize(self):
-        """初始化环境和模仿学习模型"""
-        from head.manager.imitation_selector import resolve_imitation_strategy
-
-        # 初始化环境
+        """Initialize the environment; the MetaDrive policy owns inference."""
         self.env = make_env(self.cfg)
-
-        # 加载模仿学习模型
-        self.model, self.imitation_cfg = resolve_imitation_strategy(self.cfg)
-        self.inference_engine = UnitrajInference(self.imitation_cfg)
+        self.closed_loop_metrics = _closed_loop_metrics_for(self.cfg)
+        policy = self.env.engine.get_policy(self.env.agents["default_agent"].name)
+        self.model = getattr(policy, "model", None)
+        self.max_closed_loop_steps = getattr(policy, "max_closed_loop_steps", None)
         print('[信息] 环境和模仿学习模型已初始化')
 
     def train(self):
@@ -165,83 +196,95 @@ class ImitationStrategy(NoEvolutionStrategy):
         注意: 这里只是占位实现,完整的实现需要参考UnitrajInference类,
         包括scenario数据处理、agent和map数据准备、batch创建等步骤。
         """
-        if self.env is None or self.model is None:
+        if self.env is None:
             print("[警告] 环境或模型未初始化,请先调用agent_initialize()")
             return
 
-        print('[信息] 开始推理')
+        print('[信息] 开始闭环评测')
 
-        last_batch_dict, last_prediction = self.inference_engine.run_inference_step(to_device_func=to_device)
-        if self.cfg.args.training.show_render_info:
-            self._render()
-
-        if (last_batch_dict is not None) and (last_prediction is not None):
-            print("推理完成，正在生成可视化结果...")
-            # 生成带时间戳的文件名，避免覆盖
-            ts = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-            final_path = os.path.join(SAVE_DIR, f"prediction_vs_gt_{ts}.jpg")
-
-            visualization.visualize_prediction(
-                last_batch_dict,
-                last_prediction,
-                save_path=final_path,
-                rotate=180
-            )
-            print(f"✅ 可视化图片已保存至: {final_path}")
-
-        print('[信息] 评估完成')
-        print('[信息] 评估完成')
+        try:
+            for i_ep in range(self.cfg.args.evaluation.episodes):
+                if i_ep > 0:
+                    self.env.reset()
+                if self.closed_loop_metrics is not None:
+                    self.closed_loop_metrics.start_episode()
+                ep_reward = 0.0
+                ep_len = 0
+                scenario = self.env.engine.data_manager.current_scenario
+                sdc_id = str(scenario["metadata"]["sdc_id"])
+                scenario_steps = len(scenario["tracks"][sdc_id]["state"]["position"])
+                max_steps = min(self.cfg.args.evaluation.max_steps, scenario_steps - 1)
+                if self.max_closed_loop_steps is not None:
+                    max_steps = min(max_steps, self.max_closed_loop_steps)
+                for i_step in range(max_steps):
+                    next_state, reward, done, termin, info = self.env.step(None)
+                    if self.closed_loop_metrics is not None:
+                        self.closed_loop_metrics.step(info, next_state, i_step, self.env)
+                    ep_reward += float(reward)
+                    ep_len += 1
+                    if self.cfg.args.simulation.render:
+                        self._render()
+                    if done or termin:
+                        break
+                if self.closed_loop_metrics is not None:
+                    self.closed_loop_metrics.finish_episode(
+                        episode_index=i_ep + 1,
+                        reward=ep_reward,
+                        length=ep_len,
+                        env=self.env,
+                    )
+            print('[信息] 闭环评测完成')
+            if self.closed_loop_metrics is not None:
+                metrics_path = self.closed_loop_metrics.save()
+                if metrics_path is not None:
+                    print(f"[信息] 闭环指标已保存: {metrics_path}")
+        finally:
+            self.env.close()
         # 3. 使用结果进行可视化
 
 
     def load(self):
-        """加载模型权重"""
-        # TODO: 实现模型权重加载逻辑
-        ckpt_path = self.cfg.args.algorithm['deployment']['config']['imitation']['model']['pretrained_path']
-        ckpt = torch.load(ckpt_path, map_location="cuda", weights_only=False)
-        self.model.load_state_dict(ckpt["state_dict"])
-        self.model = self.model.to(self.device)
-        self.inference_engine.init_env_and_model(self.env, self.model)
+        """The closed-loop policy loads its model during environment creation."""
+        return None
 
 def resolve_evolution_strategy(cfg):
     """
     根据配置选择对应的策略类。
-    - 如果 algorithm.mode 为 'deployment' 且部署方法为 IDM,返回NoEvolutionStrategy
-    - 如果 algorithm.mode 为 'deployment' 且部署方法为 imitation,返回ImitationStrategy
-    - 如果 algorithm.mode 为 'deployment' 且部署方法为 Poly,走正常进化流程
-    - 如果 algorithm.mode 为 'evolutionary',根据 evolution_method_type 选择对应的策略类
+    - deploy + IDM/Zero: NoEvolutionStrategy
+    - deploy + imitation: ImitationStrategy
+    - deploy + Poly: evolution learner in evaluation mode when a checkpoint exists
+    - evolution + any policy: configured evolution learner
     """
-    mode = getattr(cfg.args.algorithm, "mode", None)
+    mode = cfg.args.workflow.type
+    if mode == "evo":
+        mode = "evolution"
     
     # 部署模式
-    if mode == "deployment":
-        deployment_method = cfg.args.algorithm.deployment.deployment_method.get('main')
+    if mode == "deploy":
+        policy = cfg.args.workflow.policy
         
-        # 根据不同的部署方法返回不同的策略
-        if deployment_method == 'IDM':
-            print(f"[信息] 检测到部署模式,部署方法为:IDM,不使用进化策略")
+        if policy == 'IDM':
+            print("[信息] 检测到部署模式,基础策略为:IDM,不使用进化策略")
             return NoEvolutionStrategy
-        elif deployment_method == 'imitation':
-            print(f"[信息] 检测到部署模式,部署方法为:imitation,使用模仿学习策略")
+        elif policy == 'imitation':
+            print("[信息] 检测到imitation基础策略,使用模仿学习策略")
             return ImitationStrategy
-        elif deployment_method == 'Poly':
-            print(f"[信息] 检测到部署模式,部署方法为:Poly,需要使用进化策略")
-            # 继续往下执行,走evolutionary的逻辑
+        elif policy == 'Poly':
+            if not has_poly_checkpoint(cfg.args):
+                print("[信息] deploy + Poly 未找到权重，使用随机 action_space.sample()")
+                return NoEvolutionStrategy
+            print("[信息] 检测到部署模式,基础策略为:Poly,需要加载进化权重")
+        elif policy == 'Zero':
+            print("[信息] 检测到部署模式,基础策略为:Zero,不使用进化策略")
+            return NoEvolutionStrategy
         else:
-            raise ValueError(f"未知的部署方法 '{deployment_method}'")
+            raise ValueError(f"未知的部署策略 '{policy}'")
     
     # 进化模式 或 需要进化的部署模式
-    if mode == "evolutionary" or (mode == "deployment"):
-        sel_cfg = cfg.args.algorithm.evolutionary['evolution_method_type']
-        main = sel_cfg.get('main')
-        sub = sel_cfg.get('sub')
-        candidates = sel_cfg.get('candidates', {})
-
-        # 基本合法性检查
-        if main not in candidates:
-            raise ValueError(f"主策略 '{main}' 无效,可选项为: {list(candidates.keys())}")
-        if sub not in candidates[main]:
-            raise ValueError(f"子策略 '{sub}' 不属于主策略 '{main}' 的候选范围,可选项为: {candidates[main]}")
+    if mode == "evolution" or mode == "deploy":
+        sel_cfg = cfg.args.workflow.evolution
+        main = sel_cfg.strategy
+        sub = sel_cfg.learner
 
         # 映射表检查
         if main not in EVOLUTION_STRATEGY_MAPPING or sub not in EVOLUTION_STRATEGY_MAPPING[main]:
@@ -253,4 +296,4 @@ def resolve_evolution_strategy(cfg):
         return StrategyClass
     
     else:
-        raise ValueError(f"无效的算法模式 '{mode}',必须是 'evolutionary' 或 'deployment'")
+        raise ValueError(f"无效的 workflow.type '{mode}',必须是 'evolution' 或 'deploy'")

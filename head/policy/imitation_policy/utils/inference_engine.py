@@ -24,11 +24,11 @@ from head.policy.imitation_policy.utils.map_utils import get_map_data, get_manua
 from head.policy.imitation_policy.utils.agent_utils import transform_trajs_to_center_coords, get_agent_data, get_interested_agents, trajectory_filter
 
 class UnitrajInference:
-    def __init__(self, cfg):
+    def __init__(self, cfg, device=None):
         self.global_cfg = cfg
         self.imitation_algo = None
         self.env = None
-        self.device = "cuda"
+        self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
 
     def init_env_and_model(self,env, model):
         """Initialize the imitation model and environment."""

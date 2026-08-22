@@ -1,1 +1,5 @@
-env_name: 'metadrive-v0'
+scenario:
+  environment: metadrive-v0
+  kind: generated
+  capabilities:
+    closed_loop_imitation: false

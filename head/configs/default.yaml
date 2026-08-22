@@ -1,94 +1,67 @@
-# environment
-task_list:
-  - muti_scenario-v0
-  - straight_config_traffic-v0
-  - single_scenario-v0
-  - real_scenario-v0 # Poly在 real_scenario下暂无部署模式
+# Task candidates:
+# - straight_config_traffic-v0: generated straight road with configurable traffic
+# - single_scenario-v0: one generated scenario (map X)
+# - multi_scenario-v0: multiple generated scenarios (maps XCO)
+# - real_scenario-v0: recorded Waymo/Geely scenarios; required for imitation
+task: straight_config_traffic-v0
+modality: state       # state (pixels is not implemented yet)
 
-task: real_scenario-v0
-modality: state
+# workflow.type selects the lifecycle. workflow.policy selects one of four
+# peer policies; evolution and imitation settings are configured separately.
+workflow:
+  type: deploy           # deploy | evolution
+  policy: Poly                 # IDM | Poly | Zero | imitation
+  evolution:
+    strategy: RLBoost
+    learner: SAC
+  policies:
+    IDM:
+      checkpoint: null
+    Zero:
+      checkpoint: null
+    Poly:
+      checkpoint: auto       # Standard task/map/train_name SAC directory
+    imitation:
+      model: wayformer       # wayformer | pluto
+      source: ../UniTraj_benchmark_sample  # UniTraj repository root
+      checkpoint: artifacts/weights/imitation/wayformer/brier_fde=1.45.ckpt
+                               # Relative to the project root
+      closed_loop: true
+      warmup_steps: 21
+      replan_frequency: 5
+      prediction_horizon: 60
+      controller:
+        dt: 0.1
+        lateral_pid: {kp: 0.8, ki: 0.05, kd: 0.0}
+        longitudinal_pid: {kp: 2.0, ki: 0.0, kd: 0.0}
+        lookahead: {min_distance: 2.0, max_distance: 6.0}
+runtime:
+  seed: 10
+  device: auto             # auto | cpu | cuda
 
-# training
-training:
-  use_vec_env: False  # 是否使用向量化环境
-  env_num: 1  # 向量化环境中的环境数量（仅在 use_vec_env 为 True 时生效）
-  show_render_info: True  # 是否显示渲染信息（仅在 use_vec_env 和save_video均为False时生效）
-  lane_num: 4  # 车道数量
+simulation:
+  vectorized: false
+  num_envs: 1
+  render: true
+  lane_count: 4
 
-# 算法具体配置
-algorithm:
-  mode: deployment  # 可选：evolutionary / deployment /imitation ，用于明确启用哪类算法
+evaluation:
+  mode: closed_loop
+  episodes: 1
+  max_steps: 400
+  interval_steps: 100000
+  save_video: false
 
-  # --- 进化算法配置（用于训练和进化策略） ---
-  evolutionary:
-    base_algorithm_type:
-      main: Poly
-      candidates:
-        - Poly
-        - Zero
+logging:
+  wandb:
+    enabled: false
+    project: HEAD
+    entity: shuo_yang
 
-    evolution_method_type:
-      main: RLBoost
-      sub: SAC
-      candidates:
-        RLBoost:
-          - SAC
-          - PPO
-        DreamMethod:
-          - HeadMethodInDream
-
-  # ---------------- Deployment Configuration ----------------
-  deployment:
-    deployment_method:
-      main: imitation    # 当前部署方法，可选 IDM / Poly / imitation
-      candidates:
-        - IDM
-        - Poly
-        - imitation
-
-     # 具体配置项
-    config:
-      # --- IDM 部署 ---
-      IDM:
-        type: rule_based
-        description: Intelligent Driver Model baseline
-
-      # --- Poly 部署 ---
-      Poly:
-        type: learned_policy
-        description: Polynomial-based policy model
-
-      # --- Imitation Learning 部署 ---
-      imitation:
-        type: imitation_learning
-        description: Imitation learning policy deployment
-        model:
-          main: wayformer
-          candidates:
-            - wayformer
-            - MTR
-            - autobot
-          pretrained_path: /home/test/git_shuo/HEAD/head/policy/imitation_policy/checkpoints/brier_fde=1.45.ckpt
-        dataset:
-          source: /datasets/
-          preprocessing: standardize
-
-
-
-# misc
-misc:
-  seed: 10  # 随机种子
-  eval_freq: 100000  # 评估频率（每多少步评估一次）
-  eval_episodes: 30  # 每次评估的 episode 数量
-  save_video: True  # 是否保存视频
-
-# environment-specific settings
-env:
-  env_name: metadrive-v0  # 环境名称
-
-# wandb configuration
-wandb:
-  use_wandb: False
-  wandb_project: Head
-  wandb_entity: shuo_yang
-
+artifacts:
+  root: artifacts
+  weights:
+    evolution: weights/evolution
+    imitation: weights/imitation
+  logs: logs
+  evaluation: eval

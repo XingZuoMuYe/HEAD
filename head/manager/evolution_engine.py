@@ -20,6 +20,6 @@ class evolution_engine(object):
         self.evolution_algo.train()
 
     def eval(self):
-        if self.cfg.args.algorithm['deployment']['deployment_method']['main'] ==  'Poly':
+        if self.cfg.args.workflow.policy == 'Poly':
             self.evolution_algo.load()
         self.evolution_algo.eval()

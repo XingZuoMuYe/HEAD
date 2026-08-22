@@ -275,7 +275,7 @@ class ConTrafficManager(BaseManager):
             traffic_v_config.update(self.engine.global_config["traffic_vehicle_config"])
             random_v = self.spawn_object(vehicle_type, vehicle_config=traffic_v_config)
             from head.policy.basic_policy.idm_policy_include_pedestrian import IDMPolicyIncluedPedestrain
-            difference = float(np.random.choice(SPEED_DIFFERENCE, 1))
+            difference = float(np.random.choice(SPEED_DIFFERENCE))
             # print(difference)
             IDMPolicyIncluedPedestrain.NORMAL_SPEED = LIMIT_SPEED*difference/100
 
@@ -1056,4 +1056,3 @@ class NaturalTrafficManager(BaseManager):
             BlockVehicles(trigger_road=Road(s, e), vehicles=[old_name_to_current[name] for name in v])
             for s, e, v in state["block_triggered_vehicles"]
         ]
-

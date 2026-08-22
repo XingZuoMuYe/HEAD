@@ -1,56 +1,79 @@
 from head.policy.evolvable_policy.poly_planning_policy import RLPlanningPolicy
 from metadrive.policy.env_input_policy import EnvInputPolicy
+from metadrive.policy.base_policy import BasePolicy
 from metadrive.policy.idm_policy import IDMPolicy
 from head.policy.imitation_policy.imitation_planning_policy import ImitationPlanningPolicy
+from head.manager.artifact_paths import has_poly_checkpoint
 
 # 映射关系（可扩展）
-BASE_POLICY_MAPPING = {
+class ZeroPolicy(BasePolicy):
+    """Deployment baseline that always emits a zero control action."""
+
+    def act(self, agent_id):
+        action = [0.0, 0.0]
+        self.action_info["action"] = action
+        return action
+
+
+class RandomPolicy(EnvInputPolicy):
+    """Explicit deploy fallback when Poly has no checkpoint."""
+
+    def act(self, agent_id):
+        action = self.get_input_space().sample()
+        self.action_info["action"] = action
+        return action
+
+
+EVO_POLICY_MAPPING = {
+    'IDM': IDMPolicy,
+    'imitation': ImitationPlanningPolicy,
     'Poly': RLPlanningPolicy,
-    'Zero': EnvInputPolicy
-    # 更多可扩展项...
+    'Zero': EnvInputPolicy,
 }
 DEPLOYMENT_POLICY_MAPPING = {
     'IDM': IDMPolicy,
     'Poly': RLPlanningPolicy,
     'imitation': ImitationPlanningPolicy,
-    # 更多可扩展项...
+    'Zero': ZeroPolicy,
 }
 
 
 def resolve_agent_policy(cfg):
     """
     根据配置 cfg 中的 algorithm 字段，解析出对应的 agent_policy 类。
-    支持 evolutionary / deployment 两种模式，互斥。
+    ``workflow.type`` 表示 deploy/evolution，``workflow.policy`` 表示四个
+    同级策略（IDM、Poly、Zero、imitation）。
     """
-    mode = getattr(cfg.args.algorithm, "mode", None)
-    if mode not in ("evolutionary", "deployment"):
-        raise ValueError(f"无效的算法模式 '{mode}'，必须是 'evolutionary' 或 'deployment'。")
+    mode = cfg.args.workflow.type
+    if mode == "evo":
+        mode = "evolution"
+    if mode not in ("evolution", "deploy"):
+        raise ValueError(f"无效的 workflow.type '{mode}'，必须是 'deploy' 或 'evolution'。")
 
-    # ============ 进化算法模式 ============
-    if mode == "evolutionary":
-        evo_cfg = cfg.args.algorithm.evolutionary
+    # ============ 进化流程 ============
+    if mode == "evolution":
+        main_algo = getattr(cfg.args.workflow, "policy", None)
 
-        # 使用新的字段 'base_algorithm_type'
-        main_algo = evo_cfg.base_algorithm_type.get("main", None)
-        candidates = evo_cfg.base_algorithm_type.get("candidates", {})
-
-        if main_algo not in candidates:
-            raise ValueError(f"主算法 '{main_algo}' 不在候选列表中: {list(candidates.keys())}")
-
-        policy_class = BASE_POLICY_MAPPING[main_algo]
+        if main_algo not in EVO_POLICY_MAPPING:
+            raise ValueError(f"未知的基础策略 '{main_algo}'")
+        policy_class = EVO_POLICY_MAPPING[main_algo]
         print(f"[信息] 已选择基础算法：{main_algo}")
         return policy_class
 
-    # ============ 部署算法模式 ============
-    elif mode == "deployment":
-        dep_cfg = cfg.args.algorithm.deployment
-        algo_type = dep_cfg.deployment_method.get("main", None)
+    # ============ 部署流程 ============
+    elif mode == "deploy":
+        algo_type = getattr(cfg.args.workflow, "policy", None)
+
+        if algo_type == "Poly":
+            if not has_poly_checkpoint(cfg.args):
+                print("[警告] deploy + Poly 未找到 checkpoint，使用 action_space.sample()")
+                return RandomPolicy
 
         if algo_type not in DEPLOYMENT_POLICY_MAPPING:
-            raise ValueError(f"未知的部署算法类型 '{algo_type}'，请在 DEPLOYMENT_POLICY_MAPPING 中注册。")
+            raise ValueError(f"未知的部署基础策略 '{algo_type}'，请在 DEPLOYMENT_POLICY_MAPPING 中注册。")
 
         policy_class = DEPLOYMENT_POLICY_MAPPING[algo_type]
-        print(f"[信息] 已选择部署算法：{algo_type}")
+        print(f"[信息] 已选择部署基础策略：{algo_type}")
         return policy_class
 
     return None

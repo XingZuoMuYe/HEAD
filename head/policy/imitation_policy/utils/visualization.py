@@ -10,7 +10,7 @@ from datetime import datetime
 import matplotlib.patches as patches
 
 def visualize_prediction(batch, prediction, draw_index=0,
-                         save_path="/home/ps/zsh/UniTraj-main/unitraj/pics/expert_boston", rotate=180):
+                         save_path="prediction_vs_gt.jpg", rotate=180):
     """
     一个健壮的、专业的轨迹预测可视化函数。
     [V12] 修复右图逻辑，并增加物体类型过滤 (只画车辆)。

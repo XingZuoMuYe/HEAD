@@ -65,7 +65,7 @@ class VideoRecorder:
             })
             frame = env.head_renderer.render(**render_params)
 
-        elif self.cfg.task in ['muti_scenario-v0', 'single_scenario-v0']:
+        elif self.cfg.task in ['multi_scenario-v0', 'muti_scenario-v0', 'single_scenario-v0']:
             frame = env.head_renderer.render(**render_params)
 
         else:
@@ -88,8 +88,8 @@ class Logger(object):
         self._log_dir = make_dir(log_dir + '/wandb_info')
         self._group = cfg_to_group(cfg)
         self._eval = []
-        project, entity = cfg.wandb.wandb_project, cfg.wandb.wandb_entity
-        run_offline = not cfg.wandb.use_wandb or project == 'none' or entity == 'none'
+        project, entity = cfg.logging.wandb.project, cfg.logging.wandb.entity
+        run_offline = not cfg.logging.wandb.enabled or project == 'none' or entity == 'none'
         if run_offline:
             print(colored('Logs will be saved locally.', 'yellow', attrs=['bold']))
             self._wandb = None
@@ -101,7 +101,7 @@ class Logger(object):
                            entity=entity,
                            name=str(cfg.train_name),
                            group=self._group,
-                           tags=cfg_to_group(cfg, return_list=True) + [f'seed:{cfg.misc.seed}'],
+                           tags=cfg_to_group(cfg, return_list=True) + [f'seed:{cfg.runtime.seed}'],
                            dir=self._log_dir,
                            # config=OmegaConf.to_container(cfg, resolve=True))
                            config=cfg)
@@ -110,7 +110,7 @@ class Logger(object):
             except:
                 print('Warning: failed to init wandb. Logs will be saved locally.')
                 self._wandb = None
-        self._video = VideoRecorder(log_dir, self._wandb, cfg) if self._wandb and cfg.misc.save_video else None
+        self._video = VideoRecorder(log_dir, self._wandb, cfg) if self._wandb and cfg.evaluation.save_video else None
 
     @property
     def video(self):

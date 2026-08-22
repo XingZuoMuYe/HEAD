@@ -11,6 +11,8 @@ from collections import deque
 import shutil
 from head.evolution_engine.RLBoost.SAC.logger import Logger
 from head.evolution_engine.env_builder.env import make_env
+from head.manager.artifact_paths import evolution_paths, poly_checkpoint_roots, resolve_poly_checkpoint
+from head.manager.closed_loop_metrics import ClosedLoopMetricsRecorder
 from pathlib import Path
 
 
@@ -18,18 +20,12 @@ def clip(a, low, high):
     return min(max(a, low), high)
 
 
-def get_project_root() -> Path:
-    """获取项目的根路径（假设项目根目录是当前文件的上两级目录）。"""
-    curr_path = Path(__file__).resolve()  # 当前文件的绝对路径
-    return curr_path.parent.parent.parent.parent  # 项目根路径
-
-
 def generate_paths(args) -> dict:
     """
     根据任务名称和地图名称生成相关路径。
 
     Args:
-        args: 包含任务名称（args.task）和地图名称（args.map_name）的参数对象。
+        args: 包含任务名称（args.task）和地图名称（args.scenario.map）的参数对象。
 
     Returns:
         包含以下路径的字典：
@@ -38,43 +34,20 @@ def generate_paths(args) -> dict:
         - log_save_path: 日志保存路径
         - eval_save_path: 评估结果保存路径
     """
-    # 获取项目根路径
-    root_path = get_project_root().parent
-
-    # 解析任务名称和地图名称
-    task = args.task.split('-')[0]
-    map_name_mapping = {
-        'X': 'interaction',
-        'O': 'roundabout',
-        'C': 'circle_road',
-        'r': 'inRamp',
-        'SSSSSSSSSSSSSS': 'straight_road',
-    }
-    # 如果是直行任务并且无行人，则使用无行人的直行任务
-    map_name = map_name_mapping.get(args.map_name, args.map_name)
-    if map_name == 'straight_road' and not args.use_pedestrian:
-        map_name = 'straight_road_no_pedestrian'
-
-
+    paths = evolution_paths(args)
+    task = paths["task"]
+    map_name = paths["map"]
     print("\033[1;33m[INFO]\033[0m Task Name: \033[1;32m{}\033[0m, Map Name: \033[1;34m{}\033[0m".format(task, map_name))
 
-    # 动态生成路径
-    base = ""
-    base_result_path = root_path /"artifacts"/ "logs" / base / "RLBoost_SAC" / task / map_name
-    model_save_path = root_path /"artifacts"/ "models" / base / "RLBoost_SAC" / "checkpoints" / task / map_name
-    log_save_path = root_path /"artifacts"/ "logs" / base / "RLBoost_SAC" / task / map_name
-    eval_save_path = root_path /"artifacts"/ "eval" / base / "RLBoost_SAC" / task / map_name
-
-    # 创建目录（如果不存在）
-    for path in [base_result_path, model_save_path, log_save_path, eval_save_path]:
-        path.mkdir(parents=True, exist_ok=True)
-
-    return {
-        "base_result_path": str(base_result_path),
-        "model_save_path": str(model_save_path),
-        "log_save_path": str(log_save_path),
-        "eval_save_path": str(eval_save_path),
+    result = {
+        "base_result_path": str(paths["logs"]),
+        "model_save_path": str(paths["weights"]),
+        "log_save_path": str(paths["logs"]),
+        "eval_save_path": str(paths["evaluation"]),
+        "task": task,
+        "map": map_name,
     }
+    return result
 
 
 
@@ -115,7 +88,7 @@ def directory_check(directory_check):
 class SACConfig:
     def __init__(self, args):
         self.algo = 'SAC'
-        self.env_name = args.env_name
+        self.env_name = args.scenario.environment
         self.train_name = args.train_name
         # 生成路径
         path_dict = generate_paths(args)
@@ -124,9 +97,11 @@ class SACConfig:
         self.model_save_path = path_dict["model_save_path"]
         self.log_save_path = path_dict["log_save_path"]
         self.eval_save_path = path_dict["eval_save_path"]
+        self.path_task = path_dict["task"]
+        self.path_map = path_dict["map"]
         self.train_eps = 200 # 1000000
-        self.eps_max_steps = 2000
-        self.eval_eps = 100000
+        self.eps_max_steps = args.evaluation.max_steps
+        self.eval_eps = args.evaluation.episodes
         self.total_steps = getattr(args, 'total_steps', 1e8)
         self.gamma = 0.99
         self.soft_tau = 5e-3
@@ -134,22 +109,31 @@ class SACConfig:
         self.policy_lr = 3e-4
         self.capacity = 1000000
         self.model_save_interval = 5000
-        self.eval_interval = args.misc.eval_freq
+        self.eval_interval = args.evaluation.interval_steps
         self.eval_total_steps = 60000
         self.hidden_dim = 256
         self.batch_size = 256
         self.alpha_lr = 3e-4
         self.AUTO_ENTROPY = True
         self.DETERMINISTIC = False
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        if args.algorithm['mode']=='deployment':
+        requested_device = args.runtime.device
+        if requested_device == "auto":
+            requested_device = "cuda" if torch.cuda.is_available() else "cpu"
+        elif requested_device == "cuda" and not torch.cuda.is_available():
+            raise RuntimeError("runtime.device is 'cuda', but CUDA is not available")
+        self.device = torch.device(requested_device)
+        if args.train_flag is not None:
+            if args.train_flag not in (0, 1):
+                raise ValueError("train_flag must be 0 (evaluation) or 1 (training)")
+            self.train_flag = args.train_flag
+        elif args.workflow.type == 'deploy':
             self.train_flag = 0
-        elif args.algorithm['mode']=='evolutionary':
+        elif args.workflow.type in ('evolution', 'evo'):
             self.train_flag = 1
         self.args = args
-        if args.training["use_vec_env"] and args.training["show_render_info"]:
-            print("Warning: 'show_render_info' is set to False because 'use_vec_env' is True.")
-            args.training["show_render_info"] = False
+        if args.simulation["vectorized"] and args.simulation["render"]:
+            print("Warning: simulation.render is disabled for vectorized environments.")
+            args.simulation["render"] = False
 
 
 class SAC_Learner:
@@ -163,9 +147,9 @@ class SAC_Learner:
         self.ma_rewards = None
         self.SAC_cfg = SAC_cfg
         self.model_save_path = self.SAC_cfg.model_save_path
-        self.model_path = self.model_save_path + '/' + self.SAC_cfg.train_name + '/'
-        self.log_path = self.SAC_cfg.log_save_path + '/' + self.SAC_cfg.train_name + '/'
-        self.eval_path = self.SAC_cfg.eval_save_path + '/' + self.SAC_cfg.train_name + '/'
+        self.model_path = str(Path(self.model_save_path) / self.SAC_cfg.train_name) + '/'
+        self.log_path = str(Path(self.SAC_cfg.log_save_path) / self.SAC_cfg.train_name) + '/'
+        self.eval_path = str(Path(self.SAC_cfg.eval_save_path) / self.SAC_cfg.train_name) + '/'
 
         self.fps = 0.0
 
@@ -217,18 +201,25 @@ class SAC_Learner:
 
         if env_name == 'S':
             self.SAC_cfg.args.task = 'straight_config_traffic-v0'
-            self.SAC_cfg.args.map_name = 'SSSSSSSSSSSSSS'
+            self.SAC_cfg.args.scenario.map = 'SSSSSSSSSSSSSS'
             # TODO 在random_env中，这两个参数暂时固定
-            self.SAC_cfg.args.scenario_difficulty =  1
-            self.SAC_cfg.args.use_pedestrian =  True
+            self.SAC_cfg.args.scenario.difficulty =  1
+            self.SAC_cfg.args.scenario.pedestrians =  True
         else:
-            self.SAC_cfg.args.task = 'muti_scenario-v0'
-            self.SAC_cfg.args.map_name = env_name
+            self.SAC_cfg.args.task = 'multi_scenario-v0'
+            self.SAC_cfg.args.scenario.map = env_name
 
     def load(self):
-        newest_model_path = self.model_path + os.listdir(self.model_path)[0]
-        self.agent.load(newest_model_path)
-        print('agent ' + self.SAC_cfg.train_name + ' is loaded')
+        checkpoint = resolve_poly_checkpoint(self.SAC_cfg.args)
+        if checkpoint is None:
+            checked = ", ".join(str(path) for path in poly_checkpoint_roots(self.SAC_cfg.args))
+            print(
+                "[警告] 未找到 Poly checkpoint，保持随机初始化。Checked: "
+                f"{checked}"
+            )
+            return
+        self.agent.load(str(checkpoint))
+        print(f"agent {self.SAC_cfg.train_name} is loaded from {checkpoint}")
 
     def render(self):
         if self.SAC_cfg.args.task == 'straight_config_traffic-v0':
@@ -238,7 +229,7 @@ class SAC_Learner:
                             film_size=(6000, 400),
                             show_plan_traj=True,
                             )
-        elif self.SAC_cfg.args.task == 'muti_scenario-v0' or self.SAC_cfg.args.task == 'single_scenario-v0':
+        elif self.SAC_cfg.args.task in ['multi_scenario-v0', 'muti_scenario-v0', 'single_scenario-v0']:
             self.env.head_renderer.render(mode="topdown",
                             screen_record=False,
                             show_plan_traj=True,
@@ -258,13 +249,13 @@ class SAC_Learner:
                             )
 
     def train(self):
-        if self.SAC_cfg.args.training.use_vec_env:
+        if self.SAC_cfg.args.simulation.vectorized:
             self.train_vec_env()
         else:
             self.train_standalone_env()
 
     def eval(self):
-        if self.SAC_cfg.args.training.use_vec_env:
+        if self.SAC_cfg.args.simulation.vectorized:
             self.eval_vec_env()
         else:
             self.eval_standalone_env()
@@ -289,7 +280,7 @@ class SAC_Learner:
             self.generate_env()
             state, _ = self.env.reset()
             ###########
-            if self.SAC_cfg.train_flag and self.SAC_cfg.args.misc.save_video and self.L.video is not None: self.L.video.init(
+            if self.SAC_cfg.train_flag and self.SAC_cfg.args.evaluation.save_video and self.L.video is not None: self.L.video.init(
                 self.env)
             ##############
             train_metrics = {}
@@ -301,9 +292,9 @@ class SAC_Learner:
 
                 next_state, reward, done, termin, info = self.env.step(action)
                 ###########
-                if self.SAC_cfg.train_flag and self.SAC_cfg.args.misc.save_video and self.L.video is not None:
+                if self.SAC_cfg.train_flag and self.SAC_cfg.args.evaluation.save_video and self.L.video is not None:
                     self.L.video.record(self.env)
-                elif self.SAC_cfg.args.training.show_render_info:
+                elif self.SAC_cfg.args.simulation.render:
                     self.render()
                 ################
                 frame_count += 1
@@ -323,7 +314,7 @@ class SAC_Learner:
 
                 if done or termin:
                     ############
-                    if self.SAC_cfg.train_flag and self.SAC_cfg.args.misc.save_video and self.L.video is not None: self.L.video.save()
+                    if self.SAC_cfg.train_flag and self.SAC_cfg.args.evaluation.save_video and self.L.video is not None: self.L.video.save()
                     ###########
                     break
 
@@ -480,9 +471,9 @@ class SAC_Learner:
 
     def eval_vec_env(self):
         print('start_eval_env')
-        self.SAC_cfg.args.training.use_vec_env = False
+        self.SAC_cfg.args.simulation.vectorized = False
         self.generate_env()
-        print('Start to eval !')
+        print('Start closed-loop evaluation')
         print(f'Env: {self.SAC_cfg.env_name}, Algorithm: {self.SAC_cfg.algo}, Device: {self.SAC_cfg.device}')
         rewards = []
         ma_rewards = []  # moving average reward
@@ -490,17 +481,19 @@ class SAC_Learner:
         ep_reward = 0.0
         collision_flag = 0.0
         if self.SAC_cfg.train_flag:
-            eval_eps = self.SAC_cfg.args.misc.eval_episodes
+            eval_eps = self.SAC_cfg.args.evaluation.episodes
         else:
             eval_eps = self.SAC_cfg.eval_eps
+        closed_loop_metrics = ClosedLoopMetricsRecorder(self.SAC_cfg)
 
         for i_ep in range(eval_eps):
 
             state, _ = self.env.reset()
-            if self.SAC_cfg.train_flag and self.SAC_cfg.args.misc.save_video and self.L.video is not None: self.L.video.init(
+            if self.SAC_cfg.train_flag and self.SAC_cfg.args.evaluation.save_video and self.L.video is not None: self.L.video.init(
                 self.env)
             eps_reward = 0.0
             ep_len = 0
+            closed_loop_metrics.start_episode()
             for i_step in range(self.SAC_cfg.eps_max_steps):
 
                 total_nums = total_nums + 1
@@ -512,10 +505,11 @@ class SAC_Learner:
                 action = self.agent.policy_net.get_action(state)
 
                 next_state, reward, done, termin, info = self.env.step(action)
+                closed_loop_metrics.step(info, next_state, i_step, self.env)
                 # print('time =', i_step/10)
-                if self.SAC_cfg.train_flag and self.SAC_cfg.args.misc.save_video and self.L.video is not None:
+                if self.SAC_cfg.train_flag and self.SAC_cfg.args.evaluation.save_video and self.L.video is not None:
                     self.L.video.record(self.env)
-                elif self.SAC_cfg.args.training.show_render_info:
+                elif self.SAC_cfg.args.simulation.render:
                     self.render()
                 state = next_state
                 eps_reward += reward
@@ -529,8 +523,15 @@ class SAC_Learner:
 
                 if done or termin:
                     print("episode_len", ep_len)
-                    if self.SAC_cfg.train_flag and self.SAC_cfg.args.misc.save_video and self.L.video is not None: self.L.video.save()
+                    if self.SAC_cfg.train_flag and self.SAC_cfg.args.evaluation.save_video and self.L.video is not None: self.L.video.save()
                     break
+
+            closed_loop_metrics.finish_episode(
+                episode_index=i_ep + 1,
+                reward=eps_reward,
+                length=ep_len,
+                env=self.env,
+            )
 
             self.eval_ep_info_buffer.append(ep_reward)
             self.eval_ep_len_buffer.append(ep_len)
@@ -556,9 +557,13 @@ class SAC_Learner:
             if total_nums >= self.SAC_cfg.total_steps:
                 break
 
-        print('Complete evaluating')
+        print('Complete closed-loop evaluation')
 
-        self.SAC_cfg.args.training.use_vec_env = True
+        metrics_path = closed_loop_metrics.save()
+        if metrics_path is not None:
+            print(f"[信息] 闭环指标已保存: {metrics_path}")
+
+        self.SAC_cfg.args.simulation.vectorized = True
         return rewards, ma_rewards
 
 
@@ -566,24 +571,26 @@ class SAC_Learner:
 
 
     def eval_standalone_env(self):
-        print('Start to eval !')
+        print('Start closed-loop evaluation')
         print(f'Env: {self.SAC_cfg.env_name}, Algorithm: {self.SAC_cfg.algo}, Device: {self.SAC_cfg.device}')
         rewards = []
         ma_rewards = []  # moveing average reward
         total_nums = 0
         ep_speed = []
         if self.SAC_cfg.train_flag:
-            eval_eps = self.SAC_cfg.args.misc.eval_episodes
+            eval_eps = self.SAC_cfg.args.evaluation.episodes
         else:
             eval_eps = self.SAC_cfg.eval_eps
+        closed_loop_metrics = ClosedLoopMetricsRecorder(self.SAC_cfg)
 
         for i_ep in range(eval_eps):
             self.generate_env()
             state, _ = self.env.reset()
-            if self.SAC_cfg.train_flag and self.SAC_cfg.args.misc.save_video and self.L.video is not None: self.L.video.init(
+            if self.SAC_cfg.train_flag and self.SAC_cfg.args.evaluation.save_video and self.L.video is not None: self.L.video.init(
                 self.env)
             eps_reward = 0.0
             ep_len = 0
+            closed_loop_metrics.start_episode()
 
             for i_step in range(self.SAC_cfg.eps_max_steps):
 
@@ -592,8 +599,9 @@ class SAC_Learner:
                 action = self.agent.policy_net.get_eval_action(state)
 
                 next_state, reward, done, termin, info = self.env.step(action)
+                closed_loop_metrics.step(info, next_state, i_step, self.env)
                 ep_speed.append(info['velocity'])
-                if self.SAC_cfg.train_flag and self.SAC_cfg.args.misc.save_video and self.L.video is not None:
+                if self.SAC_cfg.train_flag and self.SAC_cfg.args.evaluation.save_video and self.L.video is not None:
                     self.L.video.record(self.env)
                 else:
                     self.render()
@@ -602,8 +610,15 @@ class SAC_Learner:
                 ep_len += 1
                 if done or termin:
                     print("episode_len", ep_len)
-                    if self.SAC_cfg.train_flag and self.SAC_cfg.args.misc.save_video and self.L.video is not None: self.L.video.save()
+                    if self.SAC_cfg.train_flag and self.SAC_cfg.args.evaluation.save_video and self.L.video is not None: self.L.video.save()
                     break
+
+            closed_loop_metrics.finish_episode(
+                episode_index=i_ep + 1,
+                reward=eps_reward,
+                length=ep_len,
+                env=self.env,
+            )
 
             # mean_reward = eps_reward / i_step
             mead_speed = np.array(ep_speed).mean()
@@ -614,7 +629,10 @@ class SAC_Learner:
             if total_nums >= self.SAC_cfg.total_steps:
                 break
 
-        print('Complete evaluating')
+        print('Complete closed-loop evaluation')
+        metrics_path = closed_loop_metrics.save()
+        if metrics_path is not None:
+            print(f"[信息] 闭环指标已保存: {metrics_path}")
         return rewards, ma_rewards
 
     def save(self, path):

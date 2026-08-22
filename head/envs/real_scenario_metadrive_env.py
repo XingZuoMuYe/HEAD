@@ -33,8 +33,8 @@ class RealScenarioEnv(ScenarioEnv):
     def default_config(cls):
         config = super(RealScenarioEnv, cls).default_config()
         config.update(dict(
-            dataset_name=None,
-            dataset_candidates=None,
+            dataset_name="",
+            dataset_candidates={"official_datasets": [], "custom_datasets": []},
             adversarial=None,
             render_bev=True,
             frame_skip=5,

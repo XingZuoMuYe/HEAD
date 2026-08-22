@@ -5,16 +5,49 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "head"
 version = "0.1.0"
+requires-python = ">=3.9,<3.12"
 description = "HEAD project"
 authors = [{name = "Shuo Yang", email = "shuo_yang@tongji.edu.cn"}]
 dependencies = []
 
 [tool.setuptools]
+# This pyproject.toml lives inside the ``head`` source directory. Map that
+# directory to the importable ``head`` package so editable and wheel installs
+# work from outside the repository root.
+package-dir = {head = "."}
 packages = [
-    "envs",
-    "policy",
-    "configs",
-    "manager",
-    "renderer",
-    "evolution_engine"
+    "head",
+    "head.component",
+    "head.component.map",
+    "head.component.navigation",
+    "head.configs",
+    "head.envs",
+    "head.evolution_engine",
+    "head.evolution_engine.RLBoost",
+    "head.evolution_engine.RLBoost.SAC",
+    "head.evolution_engine.common",
+    "head.evolution_engine.env_builder",
+    "head.manager",
+    "head.manager.bev_img_manager",
+    "head.policy",
+    "head.policy.basic_policy",
+    "head.policy.evolvable_policy",
+    "head.policy.evolvable_policy.common",
+    "head.policy.evolvable_policy.common.local_planner",
+    "head.policy.evolvable_policy.common.low_level_controller",
+    "head.policy.evolvable_policy.common.tools",
+    "head.policy.imitation_policy",
+    "head.policy.imitation_policy.utils",
+    "head.renderer",
+    "head.scenario_reproduction",
+    "head.scenario_reproduction.rosbag_pkl",
+    "head.scenario_reproduction.rosbag_pkl.util",
+    "head.scripts"
+]
+
+[tool.setuptools.package-data]
+head = [
+    "configs/*.yaml",
+    "configs/tasks/*.yaml",
+    "policy/evolvable_policy/common/cfgs/*.yaml"
 ]
