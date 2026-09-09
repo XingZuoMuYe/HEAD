@@ -1,4 +1,18 @@
-# HEAD closed-loop evaluation
+# 闭环评价指标
+
+定义 HEAD 闭环评测的 TTC、舒适性及综合评分，并提供原生接口和结果后处理工具。
+HEAD 与 MetaDrive 的状态接入位于 [`head/manager/evaluation_v2.py`](../head/manager/evaluation_v2.py)。
+
+| 文件 | 用途 |
+| --- | --- |
+| [`closed_loop_metrics.py`](closed_loop_metrics.py) | 基于运动状态计算 TTC 与舒适性指标 |
+| [`compute_puffer_nuplan_style_scores.py`](compute_puffer_nuplan_style_scores.py) | nuPlan-style 综合分的后处理工具 |
+| [`native_evaluation.py`](native_evaluation.py) | 原生评测接口工具，独立于 HEAD 的 MetaDrive 接入 |
+| [`test_puffer_nuplan_style_scores.py`](test_puffer_nuplan_style_scores.py) | 综合分后处理测试 |
+
+以下保留指标定义、适用范围和有效性规则。
+
+## HEAD closed-loop evaluation
 
 This package is the single source of HEAD's closed-loop metrics. The former
 UniTraj `EvaluateMetrics` recorder has been removed; `evaluation.updated_metrics`
