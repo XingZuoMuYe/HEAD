@@ -93,6 +93,8 @@ def validate_config(args):
         raise ValueError("simulation.num_envs must be at least 1")
     if args.evaluation.episodes < 1:
         raise ValueError("evaluation.episodes must be at least 1")
+    if int(args.evaluation.get("start_scenario_index", 0)) < 0:
+        raise ValueError("evaluation.start_scenario_index must be non-negative")
     if getattr(args.evaluation, "mode", "closed_loop") != "closed_loop":
         raise ValueError("evaluation.mode must be 'closed_loop'; HEAD evaluation is environment-stepped")
     if not args.artifacts.root:
@@ -129,8 +131,6 @@ def validate_config(args):
         model = imitation.get("model")
         if model not in VALID_IMITATION_MODELS:
             raise ValueError("workflow.policies.imitation.model must be 'wayformer' or 'pluto'")
-        if model == "pluto":
-            raise ValueError("imitation model 'pluto' is reserved but not implemented yet")
         if not imitation.get("source") or not imitation.get("checkpoint"):
             raise ValueError(
                 "workflow.policies.imitation.source and checkpoint are required"

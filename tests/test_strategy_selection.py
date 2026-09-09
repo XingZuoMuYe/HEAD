@@ -21,12 +21,17 @@ from head.manager.evolution_selector import resolve_evolution_strategy
     ],
 )
 def test_workflow_policy_matrix(
-    monkeypatch, workflow_type, policy, policy_name, strategy_name
+    monkeypatch, tmp_path, workflow_type, policy, policy_name, strategy_name
 ):
     overrides = [
         f"workflow.type={workflow_type}",
         f"workflow.policy={policy}",
     ]
+    if policy == 'Poly':
+        checkpoint = tmp_path / 'poly'
+        checkpoint.mkdir()
+        (checkpoint / 'sac_policy').touch()
+        overrides.append(f'workflow.policies.Poly.checkpoint={checkpoint}')
     if policy == "imitation":
         overrides.append("task=real_scenario-v0")
         overrides.extend([

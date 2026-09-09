@@ -22,14 +22,20 @@ workflow:
     Poly:
       checkpoint: auto       # Standard task/map/train_name SAC directory
     imitation:
-      model: wayformer       # wayformer | pluto
-      source: ../UniTraj_benchmark_sample  # UniTraj repository root
+      model: wayformer       # wayformer | pluto (vendored Pluto source is available)
+      source: vendor/unitraj_benchmark  # bundled UniTraj inference code
       checkpoint: artifacts/weights/imitation/wayformer/brier_fde=1.45.ckpt
                                # Relative to the project root
       closed_loop: true
       warmup_steps: 21
       replan_frequency: 5
       prediction_horizon: 60
+      sae:
+        mode: 'off'  # off | capture | identity | reconstruct | ablate
+        checkpoint: null
+        output: artifacts/sae_pilot/activations
+        feature: 0
+        scale: 0.0
       controller:
         dt: 0.1
         lateral_pid: {kp: 0.8, ki: 0.05, kd: 0.0}
@@ -46,11 +52,14 @@ simulation:
   lane_count: 4
 
 evaluation:
+  updated_metrics: true  # ego-only HEAD evaluation; the only closed-loop metric source
   mode: closed_loop
   episodes: 1
   max_steps: 400
   interval_steps: 100000
   save_video: false
+  sequential_scenarios: true
+  start_scenario_index: 0
 
 logging:
   wandb:

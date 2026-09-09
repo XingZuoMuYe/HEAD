@@ -25,6 +25,20 @@ share/python-wheels/
 artifacts/logs
 artifacts/eval
 artifacts/models
+# Model weights are downloaded, never committed (see README).
+artifacts/weights/
+artifacts/*/eval/
+# Closed-loop run outputs and research scratch space.
+artifacts/sae_pilot/
+artifacts/repair_v1/
+artifacts/sae_*/
+artifacts/wayformer_*/
+artifacts/pluto_*/
+reports/
+# Checkpoint formats, wherever they land.
+*.ckpt
+*.pth
+*.safetensors
 .installed.cfg
 *.egg
 MANIFEST

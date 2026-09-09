@@ -154,9 +154,9 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
        Poly:
          checkpoint: auto
        imitation:
-         model: wayformer
-         source: ../UniTraj_benchmark_sample
-         checkpoint: artifacts/weights/imitation/wayformer/model.ckpt
+         model: pluto            # pluto | wayformer
+         source: vendor/unitraj_benchmark
+         checkpoint: artifacts/weights/imitation/pluto/pluto_1M_aux_cil.ckpt
    ```
 
    | Workflow | Allowed policies |
@@ -164,23 +164,55 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
    | `deploy` | `IDM`, `imitation`, `Poly`, `Zero` |
    | `evolution` | `IDM`, `imitation`, `Poly`, `Zero` |
 
-   Before selecting imitation learning, install the benchmark-specific packages
-   and its bundled ScenarioNet package:
+   Before selecting imitation learning, install the benchmark-specific packages:
 
    ```bash
-   export UNITRAJ_ROOT=/path/to/UniTraj_benchmark_sample
    uv pip install lightning pytorch-lightning hydra-core easydict einops h5py torch-geometric
-   uv pip install -e "$UNITRAJ_ROOT/scenarionet"
+   uv pip install scenarionet
    ```
 
-   Point `workflow.policies.imitation.source` at the
-   external UniTraj benchmark root (the directory containing `unitraj/`) and
-   place the Wayformer checkpoint at
-   `artifacts/weights/imitation/wayformer/brier_fde=1.45.ckpt`. The legacy
-   `head/policy/imitation_policy/checkpoints/` location is still accepted. HEAD then runs
-   ego-only closed-loop control: it warms
-   up from recorded history, replans periodically, and converts the predicted
-   trajectory to MetaDrive steering and throttle actions with PID control.
+   The UniTraj inference code for both models ships with this repository at
+   `vendor/unitraj_benchmark`, so `workflow.policies.imitation.source` needs no
+   external checkout. Model weights are **not** in git — download them first:
+
+   ```bash
+   # Wayformer
+   mkdir -p artifacts/weights/imitation/wayformer
+   curl -L -o "artifacts/weights/imitation/wayformer/brier_fde=1.45.ckpt" \
+     https://huggingface.co/GALLERVICH/WayFormer-head/resolve/main/brier_fde%3D1.45.ckpt
+
+   # verify the download (182,642,508 bytes)
+   sha256sum "artifacts/weights/imitation/wayformer/brier_fde=1.45.ckpt"
+   # f0dc49d961f6bb239855da285dd9e56ba05a13a14aa7acd37809a64a074f657b
+
+   # Pluto (official release)
+   mkdir -p artifacts/weights/imitation/pluto
+   # place pluto_1M_aux_cil.ckpt in artifacts/weights/imitation/pluto/
+   ```
+
+   Model page: <https://huggingface.co/GALLERVICH/WayFormer-head>
+
+   **Benchmark scenarios.** The frozen 171-scenario closed-loop regression set
+   (101 in `sg-one-north`, 70 in `us-ma-boston`, converted from the official
+   nuPlan v1.1 `val` split) is published separately:
+
+   ```bash
+   curl -L -o test_scenes.zip \
+     https://huggingface.co/datasets/GALLERVICH/mini_test_nuplan/resolve/main/test_scenes.zip
+   unzip test_scenes.zip           # -> scenes/, SHA256SUMS, fixed171_120_v2.json
+   sha256sum -c SHA256SUMS         # verify all 171 scenarios
+   ```
+
+   Dataset page: <https://huggingface.co/datasets/GALLERVICH/mini_test_nuplan>
+
+   `fixed171_120_v2.json` records each scenario's token, source log, city,
+   scenario type and sha256, so the set is reproducible and verifiable. Point
+   `scenario.dataset.directory` at the extracted `scenes/` directory to run
+   against it. The archive is 433 MB (700 MB extracted).
+
+   HEAD then runs ego-only closed-loop control: it warms up from recorded
+   history, replans periodically, and converts the predicted trajectory to
+   MetaDrive steering and throttle actions with PID control.
 
    ```bash
    export LD_LIBRARY_PATH=
@@ -189,11 +221,22 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
      task=real_scenario-v0 \
      workflow.type=deploy \
      workflow.policy=imitation \
-     workflow.policies.imitation.source="$UNITRAJ_ROOT" \
-     workflow.policies.imitation.checkpoint=brier_fde=1.45.ckpt \
      runtime.device=auto \
      simulation.render=false
    ```
+
+   That runs the configured default. To switch models, override two values:
+
+   ```bash
+   workflow.policies.imitation.model=wayformer \
+   workflow.policies.imitation.checkpoint="artifacts/weights/imitation/wayformer/brier_fde=1.45.ckpt"
+   ```
+
+   Pluto executes the network's top-1 trajectory by default
+   (`trajectory_selection_mode: neural_only` in
+   `vendor/unitraj_benchmark/unitraj/configs/method/Pluto.yaml`); the rule-based
+   evaluator is not constructed at all. Set it to `hybrid` to re-score
+   candidates with the rule-based evaluator instead.
 
    `imitation` is only accepted when the selected task configuration
    declares `scenario.capabilities.closed_loop_imitation: true`. Generated-road
@@ -206,18 +249,23 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
    success. The aggregate also contains `collision_rate`, `out_of_road_rate`,
    `arrive_dest_rate`, and `success_rate`.
 
-   For `real_scenario-v0`, the same file additionally contains UniTraj's
-   `EvaluateMetrics` values: `no_collision`, `area_compliance`,
-   `direction_compliance`, `ttc`, `speed_compliance`, `progress`, `comfort`,
-   and `total_score`. These metrics are independent of video rendering. Other
-   tasks still produce the generic closed-loop safety summary without requiring
-   a UniTraj checkout.
+   Closed-loop metrics come from the `evaluation` package, which is the single
+   metric source; the former UniTraj `EvaluateMetrics` recorder has been
+   removed. Each episode gets an `evaluation_v2` block scoring the ego only,
+   with two composite scores — `head_nuplan_style_strict_score` and
+   `head_nuplan_style_frame_score` — over completion, collision, off-road, TTC
+   and comfort. Episodes too short for a valid TTC or comfort sample report
+   `null` rather than zero.
+
+   Metric definitions, weights and validity rules are in
+   [`evaluation/README.md`](evaluation/README.md). These numbers are **not**
+   official nuPlan benchmark scoring.
 
    During evaluation, the key values are printed as they are collected:
 
    ```text
-   [闭环] Episode:1 Reward:43.037 Length:80 Collision:False OutOfRoad:False ArriveDest:True Success:1
-   [闭环指标] total_score:0.641 no_collision:1.000 ttc:1.000 progress:0.538 comfort:0.000
+   [HEAD evaluation] 7a2fe26f15115574 validity: {'events': True, 'ttc': True, 'comfort': True} strict: 0.83 frame: 0.79
+   [闭环] Episode:1 Reward:43.037 Length:80 Collision:False OutOfRoad:False ArriveDest:True Success:True
    [闭环汇总] Episodes:1 MeanReward:43.037 SuccessRate:1.000 CollisionRate:0.000 OutOfRoadRate:0.000 ArriveDestRate:1.000
    ```
 
@@ -227,13 +275,13 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
 
    | Workflow | IDM | Zero | Poly | imitation |
    | --- | --- | --- | --- | --- |
-   | `deploy` | rule policy | rule policy | checkpoint or random action | UniTraj checkpoint |
+   | `deploy` | rule policy | rule policy | checkpoint or random action | Pluto / Wayformer checkpoint |
    | `evolution` | SAC | SAC | SAC | SAC + UniTraj |
 
    For `deploy + Poly`, an empty `workflow.policies.Poly.checkpoint` prints a
    warning and uses `action_space.sample()`. For `evolution + IDM/Zero/Poly`, an
-   empty policy checkpoint means random initialization. `pluto` is reserved in
-   the configuration but currently rejected as not implemented.
+   empty policy checkpoint means random initialization. Both `pluto` and
+   `wayformer` are supported for `workflow.policies.imitation.model`.
 
 7. **Run the automated tests**
 
@@ -259,11 +307,6 @@ If you use HEAD in your own work, please cite:
 }
 ```
 
-
-
-
-
-
 ## Acknowledgements
 
 This project integrates and builds upon the following excellent open-source works:
@@ -281,7 +324,6 @@ This project integrates and builds upon the following excellent open-source work
 
 We gratefully acknowledge their contributions to the autonomous driving and imitation learning communities.
 
-
 ``` text
 @article{li2021metadrive,
   title={MetaDrive: Composing Diverse Driving Scenarios for Generalizable Reinforcement Learning},
@@ -290,8 +332,6 @@ We gratefully acknowledge their contributions to the autonomous driving and imit
   year={2021}
 }
 ```
-
-
 
 ## Relevant Projects
 
@@ -329,208 +369,21 @@ HEAD/
 │   │   ├── config_manager.py    # config merge and validation
 │   │   ├── evolution_selector.py
 │   │   ├── artifact_paths.py    # checkpoint and output resolution
-│   │   └── closed_loop_metrics.py
+│   │   ├── closed_loop_metrics.py  # MetaDrive events + evaluation delegation
+│   │   └── evaluation_v2.py     # adapter into the evaluation package
 │   ├── policy/
 │   │   ├── basic_policy/        # IDM and Zero
 │   │   ├── evolvable_policy/    # Poly and local planner
-│   │   └── imitation_policy/    # UniTraj inference and controller
+│   │   └── imitation_policy/    # Pluto / Wayformer inference and controller
 │   ├── renderer/
 │   └── scripts/main_head.py     # closed-loop entry point
+├── evaluation/                 # closed-loop metric definitions (single source)
+├── vendor/unitraj_benchmark/   # bundled UniTraj inference code for both models
 ├── tests/                      # configuration, environment, policy, metrics tests
-├── artifacts/                  # generated eval/closed_loop, logs, and weights
+├── artifacts/                  # generated eval/closed_loop and logs; weights are downloaded
 ├── assets/                     # figures and project images
 ├── requirements.txt
 ├── README.md
 └── LICENSE
 ```
 
-The detailed tree below is a legacy snapshot retained for reference; the
-top-level structure above is authoritative.
-
-<details>
-<summary>Legacy generated tree</summary>
-
-```text
-├.
-├── artifacts
-│   ├── eval
-│   │   └── RLBoost_SAC
-│   │       ├── muti_scenario
-│   │       │   └── XCO
-│   │       ├── real_scenario
-│   │       │   └── real
-│   │       ├── single_scenario
-│   │       │   ├── interaction
-│   │       │   └── roundabout
-│   │       └── straight_config_traffic
-│   │           └── straight_road
-│   ├── logs
-│   │   └── RLBoost_SAC
-│   │       ├── muti_scenario
-│   │       │   └── XCO
-│   │       │       └── wandb_info
-│   │       ├── real_scenario
-│   │       │   └── real
-│   │       │       └── wandb_info
-│   │       ├── single_scenario
-│   │       │   ├── interaction
-│   │       │   │   └── wandb_info
-│   │       │   └── roundabout
-│   │       │       └── wandb_info
-│   │       └── straight_config_traffic
-│   │           └── straight_road
-│   └── models
-│       └── RLBoost_SAC
-│           └── checkpoints
-│               ├── muti_scenario
-│               │   └── XCO
-│               ├── real_scenario
-│               │   ├── geely
-│               │   ├── real
-│               │   └── waymo
-│               ├── single_scenario
-│               │   ├── circle_road
-│               │   ├── inRamp
-│               │   ├── interaction
-│               │   └── roundabout
-│               └── straight_config_traffic
-│                   ├── straight_road
-│                   └── straight_road_no_pedestrian
-├── assets
-│   ├── closed_loop_structure.jpg
-│   ├── experiment_2.jpg
-│   ├── experiment.jpg
-│   ├── HEAD-icon.jpg
-│   ├── HEAD.jpg
-│   └── HEAD-structure.png
-├── debug
-│   └── head_debug.py
-├── geely
-├── head
-│   ├── component
-│   │   ├── map
-│   │   │   ├── custom_light_manager.py
-│   │   │   ├── custom_map_manager.py
-│   │   │   └── lane_utils.py
-│   │   └── navigation
-│   │       └── custom_navigation.py
-│   ├── configs
-│   │   ├── default.yaml
-│   │   └── tasks
-│   │       ├── default.yaml
-│   │       ├── muti_scenario.yaml
-│   │       ├── real_scenario.yaml
-│   │       ├── single_scenario.yaml
-│   │       └── straight_config_traffic.yaml
-│   ├── envs
-│   │   ├── config_traffic_metadrive_env.py
-│   │   ├── __init__.py
-│   │   ├── multi_scenario_metadrive_env.py
-│   │   └── real_scenario_metadrive_env.py
-│   ├── evolution_engine
-│   │   ├── common
-│   │   │   ├── __init__.py
-│   │   │   ├── memory.py
-│   │   │   ├── model.py
-│   │   │   ├── multiprocessing_env.py
-│   │   │   ├── plot.py
-│   │   │   ├── running_mean_std.py
-│   │   │   └── utils.py
-│   │   ├── env_builder
-│   │   │   ├── env.py
-│   │   │   └── __init__.py
-│   │   ├── __init__.py
-│   │   └── RLBoost
-│   │       ├── __init__.py
-│   │       └── SAC
-│   │           ├── agent.py
-│   │           ├── cfg.py
-│   │           ├── __init__.py
-│   │           ├── logger.py
-│   │           ├── model.py
-│   │           └── SAC_learner.py
-│   ├── __init__.py
-│   ├── manager
-│   │   ├── base_algorithm_selector.py
-│   │   ├── bev_img_manager
-│   │   │   └── bev_img_manager.py
-│   │   ├── config_manager.py
-│   │   ├── config_pedestrain_manager.py
-│   │   ├── config_traffic_manager.py
-│   │   ├── evolution_engine.py
-│   │   ├── evolution_selector.py
-│   │   └── __init__.py
-│   ├── policy
-│   │   ├── basic_policy
-│   │   │   ├── idm_policy_include_pedestrian.py
-│   │   │   ├── idm_policy_with_osm.py
-│   │   │   └── __init__.py
-│   │   ├── evolvable_policy
-│   │   │   ├── common
-│   │   │   │   ├── cfgs
-│   │   │   │   │   └── config.yaml
-│   │   │   │   ├── config.py
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── local_planner
-│   │   │   │   │   ├── 编译命令.txt
-│   │   │   │   │   ├── CMakeLists.txt
-│   │   │   │   │   ├── cubic_spline_planner.py
-│   │   │   │   │   ├── frenet_optimal_trajectory.py
-│   │   │   │   │   ├── __init__.py
-│   │   │   │   │   ├── setup.py
-│   │   │   │   │   ├── spline_utils.pyx
-│   │   │   │   │   └── util.cpp
-│   │   │   │   ├── low_level_controller
-│   │   │   │   │   ├── controller.py
-│   │   │   │   │   └── __init__.py
-│   │   │   │   ├── tools
-│   │   │   │   │   ├── __init__.py
-│   │   │   │   │   ├── misc.py
-│   │   │   │   │   └── utils.py
-│   │   │   │   └── utils.py
-│   │   │   ├── __init__.py
-│   │   │   └── poly_planning_policy.py
-│   │   └── __init__.py
-│   ├── pyproject.toml
-│   ├── renderer
-│   │   ├── head_renderer.py
-│   │   └── top_down_renderer.py
-│   ├── scenario_datasets
-│   │   ├── geely.zip
-│   │   └── waymo.zip
-│   ├── scenario_reproduction
-│   │   ├── __init__.py
-│   │   └── rosbag_pkl
-│   │       ├── data_convert.py
-│   │       ├── __init__.py
-│   │       ├── README.md
-│   │       └── util
-│   │           ├── dataset_summary.py
-│   │           ├── GNSS_info_process.py
-│   │           ├── GNSS_Transform.py
-│   │           ├── __init__.py
-│   │           ├── obj_info.py
-│   │           ├── osm_scenario.py
-│   │           └── raw_data
-│   │               ├── scenario_1
-│   │               ├── scenario_2
-│   │               ├── scenario_3
-│   │               ├── scenario_4
-│   │               └── scenario_5
-│   └── scripts
-│       ├── __init__.py
-│       └── main_head.py
-├── LICENSE
-├── README.md
-├── requirements.txt
-├── start_train.sh
-├── tests
-│   ├── drive_in_real_env.py
-│   ├── env_render_plot.py
-│   ├── map.jpg
-│   └── run_env.py
-└── waymo
-
-```
-
-</details>

@@ -4,7 +4,12 @@ from head.manager.artifact_paths import resolve_poly_checkpoint
 from head.manager.config_manager import get_final_config
 
 
-def test_poly_auto_finds_legacy_stage_checkpoint(monkeypatch):
+def test_poly_auto_finds_legacy_stage_checkpoint(monkeypatch, tmp_path):
+    # A clean server checkout must not depend on the developer's real weights.
+    stage = tmp_path / 'legacy' / 'stage_1'
+    stage.mkdir(parents=True)
+    (stage / 'sac_policy').touch()
+    monkeypatch.setattr('head.manager.artifact_paths.poly_checkpoint_roots', lambda args: [stage.parent])
     monkeypatch.setattr("sys.argv", ["main_head.py", "task=straight_config_traffic-v0", "workflow.policy=Poly"])
     cfg = get_final_config()
     checkpoint = resolve_poly_checkpoint(cfg.args)

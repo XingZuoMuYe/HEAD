@@ -5,7 +5,11 @@ import re
 import numpy as np
 import torch
 import pandas as pd
-from termcolor import colored
+try:
+    from termcolor import colored
+except ImportError:
+    def colored(text, *args, **kwargs):
+        return str(text)  # Console colours are optional for headless deployment.
 from omegaconf import OmegaConf
 
 CONSOLE_FORMAT = [('episode', 'E', 'int'), ('env_step', 'S', 'int'), ('episode_reward', 'R', 'float'),

@@ -35,11 +35,13 @@ def ensure_unitraj_path(source=None):
             sys.path.insert(0, str(root))
         _install_namespace(root, "models")
         _install_namespace(root, "datasets")
+        _install_namespace(root, "closeloop")
         return root
 
     package_root = Path(__file__).resolve().parents[3]
     candidates = [Path(entry) if entry else Path.cwd() for entry in sys.path]
     candidates.extend([
+        package_root / "vendor" / "unitraj_benchmark",
         package_root.parent / "UniTraj_benchmark_sample",
         Path.cwd().parent / "UniTraj_benchmark_sample",
     ])
@@ -50,6 +52,7 @@ def ensure_unitraj_path(source=None):
                 sys.path.insert(0, str(root))
             _install_namespace(root, "models")
             _install_namespace(root, "datasets")
+            _install_namespace(root, "closeloop")
             return root
     raise ModuleNotFoundError(
         "UniTraj is required for imitation closed-loop mode. Set "

@@ -1,0 +1,72 @@
+# common
+model_name: Pluto
+ckpt_path: "/data_set/UniTraj_benchmark/unitraj/configs/pluto_1M_aux_cil.ckpt"
+
+# Wandb Config
+use_wandb: False
+username: 1346037269-
+project: Pluto
+
+# Model parameters
+dim: 128
+state_channel: 6
+polygon_channel: 6
+history_channel: 9
+history_steps: 21
+future_steps: 80
+encoder_depth: 4
+decoder_depth: 4
+drop_path: 0.2
+dropout: 0.1
+num_heads: 4
+num_modes: 12
+state_dropout: 0.75
+use_ego_history: false
+state_attn_encoder: true
+use_hidden_proj: true
+cat_x: true
+ref_free_traj: true
+# Dataset processing & inference parameters
+test_mode: default
+step_interval: 0.1
+eval_dt: 0.1
+eval_num_frames: 80
+trajectory_selection_mode: neural_only
+learning_based_score_weight: 1.0
+rule_based_score_weight: 0.0
+use_prediction: true
+candidate_max_num: 36
+candidate_min_num: 1
+candidate_subsample_ratio: 0.5
+
+# AV1 is selected by normal max rule score. Override its rule weights so it
+# prefers safe, stable, reference-following responses over pure progress.
+av1_rule_override_enabled: true
+av1_rule_weight_progress: 3.0
+av1_rule_weight_comfort: 2.0
+av1_rule_weight_ref_tracking: 3.0
+av1_rule_collision_penalty: 100.0
+av1_rule_wrong_way_penalty: 30.0
+av1_rule_based_feasible_margin: 25.0
+
+# feature_builder
+radius: 120
+history_horizon: 2
+future_horizon: 8
+sample_interval: 0.1
+max_agents: 48
+build_reference_line: true
+enable_route_lateral_refline: true
+route_lateral_refline_hops: 2
+route_lateral_same_direction_only: true
+route_lateral_heading_threshold: 1.0471975512
+map_feature_cache_distance: 25.0
+map_cache_build_radius: 150.0
+scene_map_relevant_distance: 120.0
+scene_map_cache_margin: 10.0
+reference_line_cache_heading_threshold: 0.7
+reference_line_cache_lateral_distance: 12.0
+reference_line_cache_min_remaining: 20.0
+reference_line_build_radius: 180.0
+
+render: false

@@ -9,6 +9,7 @@ scenario:
     supported:
       official:
         - waymo
+        - nuplan
       custom:
         - geely
   reactive_traffic: false

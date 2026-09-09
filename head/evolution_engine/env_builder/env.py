@@ -1,7 +1,6 @@
 import warnings
 
 from head.envs import StraightConfTraffic, MultiScenario, RealScenarioEnv
-from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
 from functools import partial
 from head.manager.base_algorithm_selector import resolve_agent_policy
 from pathlib import Path
@@ -88,6 +87,9 @@ class EnvConfig:
                 )
             base_path = get_project_root()
             data_directory = base_path / 'scenario_datasets' / dataset_name
+            configured_directory = cfg.args.scenario.dataset.get("directory", None)
+            if configured_directory:
+                data_directory = Path(str(configured_directory)).resolve()
             self.common_config['dataset_name'] = dataset_name
             self.common_config['data_directory'] = data_directory
             self.common_config['reactive_traffic'] = cfg.args.scenario.reactive_traffic
@@ -96,9 +98,16 @@ class EnvConfig:
                 'custom_datasets': custom_datasets,
             }
             self.common_config['adversarial'] = cfg.args.scenario.adversarial
+            self.common_config['render_bev'] = bool(cfg.args.simulation.get('render_bev', False))
 
             self.common_config.update({
-                "num_scenarios": 3,
+                "num_scenarios": int(cfg.args.evaluation.get("num_scenarios", 3)),
+                "sequential_seed": bool(
+                    cfg.args.evaluation.get("sequential_scenarios", True)
+                ),
+                "start_scenario_index": int(
+                    cfg.args.evaluation.get("start_scenario_index", 0)
+                ),
             })
 
     def create_env(self, seed):
@@ -131,6 +140,13 @@ def make_env(cfg):
     # Create a single environment or a vectorized environment
     env_config = EnvConfig(cfg)
     if cfg.args.simulation.vectorized:
+        try:
+            from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
+        except ImportError as exc:
+            raise ImportError(
+                "Vectorized environments require stable-baselines3. Install it "
+                "in the active Conda environment or set simulation.vectorized=false."
+            ) from exc
         env = SubprocVecEnv(
             [partial(env_config.create_env, seed_generator.next_seed()) for _ in range(cfg.args.simulation.num_envs)])
     else:

@@ -4,7 +4,10 @@
 描述: imitation_selector.py - 解析并实例化选定的模仿学习策略。
 """
 
-from pathlib import Path
+import random
+
+import numpy as np
+import torch
 from omegaconf import OmegaConf
 from head.manager.artifact_paths import resolve_imitation_checkpoint
 from head.policy.imitation_policy.unitraj_loader import ensure_unitraj_path
@@ -24,19 +27,16 @@ def resolve_imitation_strategy(cfg):
     imitation_cfg = cfg.args.workflow.policies.imitation
     source = imitation_cfg.get("source", None)
     source_root = ensure_unitraj_path(source)
-    from unitraj.utils.utils import set_seed
-    
     # 1. 从外层配置拿 method 名字
-    method_name = imitation_cfg.model
+    method_name = str(imitation_cfg.model)
     print(f"[外层配置指定的 imitation method] {method_name}")
-    if method_name == "pluto":
-        raise ValueError("imitation model 'pluto' is reserved but not implemented yet")
 
     # 2. 找到对应的内部 config 文件
     METHOD_CONFIG_DIR = source_root / "unitraj" / "configs" / "method"
     GLOBAL_CONFIG_DIR = source_root / "unitraj" / "configs"
     
-    method_cfg_path = METHOD_CONFIG_DIR / f"{method_name}.yaml"
+    method_config_name = "Pluto" if method_name.lower() == "pluto" else method_name
+    method_cfg_path = METHOD_CONFIG_DIR / f"{method_config_name}.yaml"
     global_cfg_path = GLOBAL_CONFIG_DIR / "config.yaml"
     
     if not method_cfg_path.exists():
@@ -48,13 +48,21 @@ def resolve_imitation_strategy(cfg):
     method_cfg = OmegaConf.load(method_cfg_path)
     global_cfg = OmegaConf.load(global_cfg_path)
     merged_cfg = OmegaConf.merge({"method": method_cfg}, method_cfg, global_cfg)
-    merged_cfg.model_name = method_name
+    merged_cfg.model_name = method_config_name
     merged_cfg.ckpt_path = str(resolve_imitation_checkpoint(cfg.args))
     merged_cfg["eval"] = True
-    set_seed(merged_cfg.seed)
+    seed = int(merged_cfg.get("seed", 0))
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
     # 4. 构建模型
-    if method_name == "wayformer":
+    if method_name.lower() == "pluto":
+        from unitraj.models.pluto.pluto_model import PlanningModel
+        model_class = PlanningModel
+    elif method_name == "wayformer":
         from unitraj.models.wayformer.wayformer import Wayformer
         model_class = Wayformer
     elif method_name == "autobot":

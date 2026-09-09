@@ -12,17 +12,19 @@ def load_config(monkeypatch, *overrides):
 
 def test_default_configuration_is_runnable(monkeypatch):
     cfg = load_config(monkeypatch)
-    assert cfg.args.task == "real_scenario-v0"
+    assert cfg.args.task == "straight_config_traffic-v0"
     assert cfg.args.workflow.type == "deploy"
-    assert cfg.args.workflow.policy == "imitation"
-    assert cfg.args.scenario.kind == "recorded"
-    assert cfg.args.scenario.capabilities.closed_loop_imitation is True
+    assert cfg.args.workflow.policy == "Poly"
+    assert cfg.args.scenario.kind == "generated"
+    assert cfg.args.scenario.capabilities.closed_loop_imitation is False
     assert cfg.args.artifacts.weights.evolution == "weights/evolution"
     assert cfg.args.artifacts.weights.imitation == "weights/imitation"
     assert cfg.args.workflow.policies.Poly.checkpoint == "auto"
     assert cfg.args.workflow.policies.imitation.checkpoint == (
         "artifacts/weights/imitation/wayformer/brier_fde=1.45.ckpt"
     )
+    assert cfg.args.evaluation.sequential_scenarios is True
+    assert cfg.args.evaluation.start_scenario_index == 0
 
 
 def test_imitation_policy_accepts_capable_task(monkeypatch):
@@ -114,16 +116,16 @@ def test_direct_imitation_alias_is_normalized(monkeypatch):
     assert cfg.args.workflow.policy == "imitation"
 
 
-def test_pluto_is_rejected_before_environment_creation(monkeypatch):
-    with pytest.raises(ValueError, match="pluto.*not implemented"):
-        load_config(
-            monkeypatch,
-            "task=real_scenario-v0",
-            "workflow.policy=imitation",
-            "workflow.policies.imitation.model=pluto",
-            "workflow.policies.imitation.source=/home/test/git_shuo/UniTraj_benchmark_sample",
-            "workflow.policies.imitation.checkpoint=brier_fde=1.45.ckpt",
-        )
+def test_pluto_is_accepted_on_recorded_scenarios(monkeypatch):
+    cfg = load_config(
+        monkeypatch,
+        "task=real_scenario-v0",
+        "workflow.policy=imitation",
+        "workflow.policies.imitation.model=pluto",
+        "workflow.policies.imitation.source=vendor/unitraj_benchmark",
+        "workflow.policies.imitation.checkpoint=artifacts/weights/imitation/pluto/pluto_1M_aux_cil.ckpt",
+    )
+    assert cfg.args.workflow.policies.imitation.model == "pluto"
 
 
 def test_imitation_missing_checkpoint_is_rejected(monkeypatch):
@@ -140,6 +142,11 @@ def test_imitation_missing_checkpoint_is_rejected(monkeypatch):
 def test_invalid_environment_count_is_rejected(monkeypatch):
     with pytest.raises(ValueError, match="num_envs"):
         load_config(monkeypatch, "simulation.num_envs=0")
+
+
+def test_invalid_scenario_start_index_is_rejected(monkeypatch):
+    with pytest.raises(ValueError, match="start_scenario_index"):
+        load_config(monkeypatch, "evaluation.start_scenario_index=-1")
 
 
 def test_pixels_modality_is_rejected_until_implemented(monkeypatch):

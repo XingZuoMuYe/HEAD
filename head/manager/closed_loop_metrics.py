@@ -1,39 +1,19 @@
 """Closed-loop evaluation metrics shared by deployment strategies.
 
-UniTraj's evaluator is an optional dependency for HEAD.  This module keeps
-that dependency lazy and writes a machine-readable summary without requiring
-the UniTraj command-line runner.
+HEAD records MetaDrive episode events here and delegates every reported metric
+to the ``evaluation`` package through :mod:`head.manager.evaluation_v2`.  The
+older UniTraj ``EvaluateMetrics`` recorder has been removed; ``evaluation`` is
+now the single source of closed-loop scores.
 """
 
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from statistics import mean
 from typing import Any, Optional
 
 from head.manager.artifact_paths import artifact_path
-from head.policy.imitation_policy.unitraj_loader import ensure_unitraj_path
-
-
-def _install_metadrive_compat_aliases() -> None:
-    """Expose the old ``metadrive.metadrive`` import path used by UniTraj."""
-    import metadrive
-    import metadrive.envs
-    import metadrive.envs.base_env
-    import metadrive.utils
-    import metadrive.utils.math
-
-    aliases = {
-        "metadrive.metadrive": metadrive,
-        "metadrive.metadrive.envs": metadrive.envs,
-        "metadrive.metadrive.envs.base_env": metadrive.envs.base_env,
-        "metadrive.metadrive.utils": metadrive.utils,
-        "metadrive.metadrive.utils.math": metadrive.utils.math,
-    }
-    for name, module in aliases.items():
-        sys.modules.setdefault(name, module)
 
 
 def _json_value(value: Any) -> Any:
@@ -72,50 +52,32 @@ def _metrics_output_path(cfg) -> Path:
 
 
 class ClosedLoopMetricsRecorder:
-    """Record UniTraj's per-step/per-episode closed-loop metrics."""
+    """Record MetaDrive episode events and the ``evaluation`` metrics."""
 
-    def __init__(self, cfg, evaluator_cls=None):
+    def __init__(self, cfg):
         self.cfg = cfg
         self.output_path = _metrics_output_path(cfg)
-        self.evaluator = None
         self.episodes = []
+        # Retained so downstream readers keep a stable metrics.json schema.
         self.error: Optional[str] = None
-        self._warned = False
+        evaluation = getattr(cfg.args, "evaluation", {})
+        self.v2_enabled = bool(evaluation.get("updated_metrics", True))
+        self.v2 = None
         self._step_flags = {
             "collision": False,
             "out_of_road": False,
             "arrive_dest": False,
         }
-        if evaluator_cls is not None:
-            self.evaluator = evaluator_cls()
-            return
-
-        # UniTraj's detailed evaluator expects recorded-scenario navigation.
-        # Generated MetaDrive tasks still use this recorder for generic
-        # closed-loop safety statistics, but do not attempt the UniTraj import.
-        if str(cfg.args.task) != "real_scenario-v0":
-            return
-
-        source = None
-        policies = getattr(cfg.args.workflow, "policies", None)
-        imitation = getattr(policies, "imitation", None) if policies is not None else None
-        if imitation is not None:
-            source = imitation.get("source", None)
-        try:
-            ensure_unitraj_path(source)
-            _install_metadrive_compat_aliases()
-            from unitraj.utils.evaluate_utils import EvaluateMetrics
-
-            self.evaluator = EvaluateMetrics()
-        except Exception as exc:  # optional metrics must not block deployment
-            self.error = f"{type(exc).__name__}: {exc}"
 
     @property
     def available(self) -> bool:
-        return self.evaluator is not None
+        return self.v2_enabled
 
     def start_episode(self) -> None:
-        """Reset per-episode state when the evaluator exposes that hook."""
+        """Reset per-episode state before a new rollout."""
+        if self.v2_enabled:
+            from head.manager.evaluation_v2 import EvaluationV2
+            self.v2 = EvaluationV2()
         self._step_flags = {
             "collision": False,
             "out_of_road": False,
@@ -124,6 +86,8 @@ class ClosedLoopMetricsRecorder:
 
     def step(self, info, observation, step_index: int, env) -> None:
         info = info or {}
+        if self.v2 is not None:
+            self.v2.step(info, env)
         collision_keys = (
             "crash_vehicle", "crash_object", "crash_human",
             "crash_building", "crash_sidewalk",
@@ -131,30 +95,13 @@ class ClosedLoopMetricsRecorder:
         self._step_flags["collision"] |= any(bool(info.get(key, False)) for key in collision_keys)
         self._step_flags["out_of_road"] |= bool(info.get("out_of_road", False))
         self._step_flags["arrive_dest"] |= bool(info.get("arrive_dest", False))
-        if self.evaluator is None:
-            return
-        try:
-            self.evaluator.step(info, observation, int(step_index), env)
-        except Exception as exc:
-            self._disable(exc)
 
     def finish_episode(self, *, episode_index: int, reward: float, length: int, env) -> None:
-        scores = None
-        scene_score = None
-        success = None
-        if self.evaluator is not None and length > 0:
-            try:
-                scene_score, scores, success = self.evaluator.reset(int(length), env)
-            except Exception as exc:
-                self._disable(exc)
         self.episodes.append(
             {
                 "episode": int(episode_index),
                 "reward": float(reward),
                 "length": int(length),
-                "scene_score": _json_value(scene_score),
-                "scores": _json_value(scores),
-                "success": _json_value(success),
                 "collision": bool(self._step_flags["collision"]),
                 "out_of_road": bool(self._step_flags["out_of_road"]),
                 "arrive_dest": bool(self._step_flags["arrive_dest"]),
@@ -162,21 +109,18 @@ class ClosedLoopMetricsRecorder:
         )
 
         item = self.episodes[-1]
-        if item["success"] is None:
-            item["success"] = not item["collision"] and not item["out_of_road"]
-        score_text = ""
-        if isinstance(item.get("scores"), dict):
-            score_parts = []
-            for key in ("no_collision", "ttc", "progress", "comfort"):
-                value = item["scores"].get(key)
-                if isinstance(value, (int, float)):
-                    score_parts.append(f"{key}:{float(value):.3f}")
-            if score_parts:
-                score_text = " " + " ".join(score_parts)
+        if self.v2 is not None:
+            item["evaluation_v2"] = self.v2.finish()
+            result = item["evaluation_v2"]
+            print("[HEAD evaluation]", result.get("scenario_id"),
+                  "validity:", result.get("validity"),
+                  "strict:", result.get("metrics", {}).get("head_nuplan_style_strict_score"),
+                  "frame:", result.get("metrics", {}).get("head_nuplan_style_frame_score"))
+        item["success"] = not item["collision"] and not item["out_of_road"]
         print(
             "[闭环] Episode:{episode} Reward:{reward:.3f} Length:{length} "
             "Collision:{collision} OutOfRoad:{out_of_road} ArriveDest:{arrive_dest} "
-            "Success:{success}{scores}".format(
+            "Success:{success}".format(
                 episode=item["episode"],
                 reward=item["reward"],
                 length=item["length"],
@@ -184,7 +128,6 @@ class ClosedLoopMetricsRecorder:
                 out_of_road=item["out_of_road"],
                 arrive_dest=item["arrive_dest"],
                 success=item["success"],
-                scores=score_text,
             )
         )
 
@@ -209,19 +152,13 @@ class ClosedLoopMetricsRecorder:
             summary["out_of_road_rate"] = mean(bool(item["out_of_road"]) for item in self.episodes)
             summary["arrive_dest_rate"] = mean(bool(item["arrive_dest"]) for item in self.episodes)
 
-        if self.evaluator is not None:
-            for key, values in getattr(self.evaluator, "round_scores", {}).items():
-                numeric = [float(value) for value in values]
-                if numeric:
-                    summary[key] = mean(numeric)
-            total_scores = [float(value) for value in getattr(self.evaluator, "total_scores", [])]
-            if total_scores:
-                summary["total_score"] = mean(total_scores)
-
         payload = {
             "schema_version": 1,
-            "source": "UniTraj EvaluateMetrics" if self.evaluator is not None else None,
-            "available": self.available,
+            "source": None,
+            # The removed UniTraj recorder never contributes again; the key stays
+            # so existing readers of metrics.json do not need a special case.
+            "legacy_source": None,
+            "available": self.v2_enabled,
             "error": self.error,
             "task": str(self.cfg.args.task),
             "policy": str(self.cfg.args.workflow.policy),
@@ -229,6 +166,44 @@ class ClosedLoopMetricsRecorder:
             "summary": _json_value(summary),
             "episodes": _json_value(self.episodes),
         }
+        if self.v2_enabled:
+            results = [item.get("evaluation_v2", {}) for item in self.episodes]
+            valid_results = [item for item in results if item.get("available")]
+            metric_keys = valid_results[0]["metrics"] if valid_results else []
+            v2_summary = {
+                key: mean(float(item["metrics"][key]) for item in valid_results)
+                for key in metric_keys
+                if all(isinstance(item["metrics"].get(key), (int, float)) for item in valid_results)
+            }
+            payload["evaluation_v2"] = dict(
+                available=bool(results) and len(valid_results) == len(results),
+                valid_episodes=len(valid_results), total_episodes=len(results),
+                aggregation="equal_weight_per_scenario; counts are means; per-episode records authoritative",
+                summary=v2_summary,
+            )
+            # Do not discard early collisions/arrivals just because comfort lacks
+            # its 15-frame window. Each metric has its own explicit denominator.
+            event_results = [item for item in results if item.get("evaluated_frames", 0) > 0]
+            per_metric = {}
+            keys = set().union(*(item.get("metrics", {}) for item in event_results))
+            for key in sorted(keys):
+                selected = event_results
+                if "score" in key:
+                    selected = valid_results
+                elif "comfort" in key and "metric_" not in key:
+                    selected = [item for item in event_results if item["metrics"].get("comfort_metric_frames", 0) > 0]
+                elif "ttc" in key and "metric_" not in key:
+                    selected = [item for item in event_results if item["metrics"].get("ttc_metric_frames", 0) > 0]
+                values = [float(item["metrics"][key]) for item in selected
+                          if isinstance(item.get("metrics", {}).get(key), (int, float))]
+                per_metric[key] = dict(mean=mean(values) if values else None, valid_episodes=len(values),
+                                       total_episodes=len(results))
+            payload["evaluation_v2"]["per_metric"] = per_metric
+            payload["evaluation_v2"]["no_controlled_frames_episodes"] = len(results)-len(event_results)
+            payload["evaluation_v2"]["summary_scope"] = "complete_metric_episodes_only; use per_metric for partial episodes"
+            payload["source"] = "HEAD evaluation/closed_loop_metrics.py + evaluation/compute_puffer_nuplan_style_scores.py"
+            payload["available"] = payload["evaluation_v2"]["available"]
+            payload["summary_scope"] = "MetaDrive episode events; canonical metrics in evaluation_v2"
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
         self.output_path.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -245,20 +220,4 @@ class ClosedLoopMetricsRecorder:
                 arrive=float(summary.get("arrive_dest_rate", 0.0)),
             )
         )
-        detailed = {
-            key: summary[key]
-            for key in ("total_score", "no_collision", "ttc", "progress", "comfort")
-            if key in summary
-        }
-        if detailed:
-            print("[闭环指标] " + " ".join(
-                f"{key}:{float(value):.3f}" for key, value in detailed.items()
-            ))
         return self.output_path
-
-    def _disable(self, exc: Exception) -> None:
-        self.error = f"{type(exc).__name__}: {exc}"
-        self.evaluator = None
-        if not self._warned:
-            print(f"[警告] 闭环指标不可用，继续评测: {self.error}")
-            self._warned = True

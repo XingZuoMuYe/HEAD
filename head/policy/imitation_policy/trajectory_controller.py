@@ -69,7 +69,13 @@ class TrajectoryController:
         tangent = points[tangent_idx] - points[match]
         traj_heading = math.atan2(float(tangent[1]), float(tangent[0])) if np.linalg.norm(tangent) > 1e-5 else heading
         heading_error = self._wrap(traj_heading - heading)
-        steering = self.lateral_pid(heading_error - math.atan2(1.5 * lateral, max(speed, 1.0)), self.dt)
+        # ``lateral`` is positive when the matched path point is to the left
+        # of the vehicle heading. MetaDrive also uses positive steering for a
+        # left turn, so the cross-track correction must have the same sign.
+        steering = self.lateral_pid(
+            heading_error + math.atan2(1.5 * lateral, max(speed, 1.0)),
+            self.dt,
+        )
 
         if traj.shape[1] >= 4:
             target_speed = float(np.linalg.norm(traj[target, 2:4]))
