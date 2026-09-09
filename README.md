@@ -8,6 +8,19 @@ HEAD is a holistic suite of evolutionary autonomous driving software, based on t
 - **Integration with Simulation Testing**: It is deeply integrated with the MetaDrive simulation platform, enabling comprehensive testing and optimization.
 - **A Closed-Loop Data-Driven Platform**: It provides a complete closed-loop system from scenario generation to algorithm evolution, enhancing adaptability and reliability in unseen scenarios through adversarial testing and continuous learning.
 ![](./assets/HEAD.jpg)
+
+## 目录导航
+
+| 目录 | 用途 |
+| --- | --- |
+| [`head/`](head/README.md) | 仿真、规划、车辆控制与模型评测 |
+| [`evaluation/`](evaluation/README.md) | 闭环评价指标与评分工具 |
+| [`vendor/`](vendor/README.md) | 第三方模型推理代码 |
+| [`tests/`](tests/README.md) | 配置、策略、环境与评价测试 |
+| [`artifacts/`](artifacts/README.md) | 模型权重、日志与运行输出 |
+| [`assets/`](assets/README.md) | 项目图片与架构示意 |
+| [`debug/`](debug/README.md) | 开发调试示例 |
+
 ## 🔧 Quick Start
 
 The commands below are the tested, minimal setup for the MetaDrive environments and
@@ -386,4 +399,3 @@ HEAD/
 ├── README.md
 └── LICENSE
 ```
-
