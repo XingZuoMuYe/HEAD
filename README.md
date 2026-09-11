@@ -1,9 +1,13 @@
 <img src="./assets/HEAD-icon.jpg" alt="HEAD icon" style="display:block; margin: 0 auto; width: 400px;">
 
 # HEAD:Holistic Evolutionary Autonomous Driving
+
 HEAD is a holistic suite of evolutionary autonomous driving software, based on the MetaDrive simulation platform, that seamlessly imports driving scenarios, uploads training models, and efficiently performs continuous training designed to significantly improve the performance of arbitrary models.
+
 ## Introduction
-**HEAD (Holistic Evolutionary Autonomous Driving)** is an Autonomous Driving Platform with the following key features: 
+
+**HEAD (Holistic Evolutionary Autonomous Driving)** is an Autonomous Driving Platform with the following key features:
+
 - **A General Self-Evolutionary Autonomous Driving Software Tool**: It combines learning-based, optimization-based, and rule-based algorithms to efficiently handle complex driving scenarios and ensure safety and performance.
 - **Integration with Simulation Testing**: It is deeply integrated with the MetaDrive simulation platform, enabling comprehensive testing and optimization.
 - **A Closed-Loop Data-Driven Platform**: It provides a complete closed-loop system from scenario generation to algorithm evolution, enhancing adaptability and reliability in unseen scenarios through adversarial testing and continuous learning.
@@ -15,7 +19,7 @@ HEAD is a holistic suite of evolutionary autonomous driving software, based on t
 | --- | --- |
 | [`head/`](head/README.md) | 仿真、规划、车辆控制与模型评测 |
 | [`evaluation/`](evaluation/README.md) | 闭环评价指标与评分工具 |
-| [`head/agents/`](head/agents/README.md) | 统一算法接口：Pluto、WayFormer 及新模型接入 |
+| [`head/model/`](head/model/README.md) | 统一算法接口：Pluto、WayFormer 及新模型接入 |
 | [`tests/`](tests/README.md) | 配置、策略、环境与评价测试 |
 | [`artifacts/`](artifacts/README.md) | 模型权重、日志与运行输出 |
 | [`assets/`](assets/README.md) | 项目图片与架构示意 |
@@ -176,22 +180,19 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
    | `deploy` | `IDM`, `imitation`, `Poly`, `Zero` |
    | `evolution` | `IDM`, `imitation`, `Poly`, `Zero` |
 
-   Each algorithm lives under [head/agents/](head/agents/README.md):
+   Each algorithm lives under [head/model/](head/model/README.md):
 
    | Model | Implementation | Input/output adapter | Configuration |
    | --- | --- | --- | --- |
-   | Pluto | [network](head/agents/pluto/model/pluto_model.py) | [Agent](head/agents/pluto/agent.py) | [config.yaml](head/agents/pluto/config.yaml) |
-   | WayFormer | [network](head/agents/wayformer/model.py) | [Agent](head/agents/wayformer/agent.py) | [config.yaml](head/agents/wayformer/config.yaml) |
+   | Pluto | [network](head/model/pluto/model/pluto_model.py) | [Adapter](head/model/pluto/adapter.py) | [config.yaml](head/model/pluto/config.yaml) |
+   | WayFormer | [network](head/model/wayformer/model.py) | [Adapter](head/model/wayformer/adapter.py) | [config.yaml](head/model/wayformer/config.yaml) |
 
    Both use the same [closed-loop inference entry](head/policy/imitation_policy/closed_loop_inference.py),
-   controller and evaluation. New algorithms implement the Agent interface in
-   their own directory; no central model switch or registry edit is required.
-   See [the integration guide](head/agents/README.md) for the input/output contract.
+   controller and evaluation. Model adapters implement the input/output contract
+   in [base.py](head/model/base.py).
 
-   **Legacy Pluto limitation:** its route builder uses the full recorded ego
-   path, including future positions (`input_scope=legacy_logged_route`).
-   This refactor preserves that existing protocol; these results must not be
-   described as strictly history-only. See [details](head/agents/pluto/README.md).
+   **Pluto input:** route estimation uses the full logged ego path, including
+   future positions; this is not strictly history-only evaluation.
 
    Model weights are **not** in git — download them first:
 
@@ -254,7 +255,7 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
 
    Pluto executes the network's top-1 trajectory by default
    (`trajectory_selection_mode: neural_only` in
-   `head/agents/pluto/config.yaml`); the rule-based
+   `head/model/pluto/config.yaml`); the rule-based
    evaluator is not constructed at all. Set it to `hybrid` to re-score
    candidates with the rule-based evaluator instead. WayFormer selects the
    highest network-probability mode, not the first output mode. The episode
@@ -272,17 +273,16 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
    success. The aggregate also contains `collision_rate`, `out_of_road_rate`,
    `arrive_dest_rate`, and `success_rate`.
 
-   Closed-loop metrics come from the `evaluation` package, which is the single
-   metric source; the former UniTraj `EvaluateMetrics` recorder has been
-   removed. Each episode gets an `evaluation_v2` block scoring the ego only,
+   Closed-loop metrics come from the `evaluation` package.
+   Each episode gets an `evaluation_v2` block scoring the ego only,
    with two composite scores — `head_nuplan_style_strict_score` and
    `head_nuplan_style_frame_score` — over completion, collision, off-road, TTC
    and comfort. Episodes too short for a valid TTC or comfort sample report
    `null` rather than zero.
 
-   Metric definitions, weights and validity rules are in
-   [`evaluation/README.md`](evaluation/README.md). These numbers are **not**
-   official nuPlan benchmark scoring.
+   Metric definitions are in [closed_loop_metrics.py](evaluation/closed_loop_metrics.py);
+   composite weights are in [compute_puffer_nuplan_style_scores.py](evaluation/compute_puffer_nuplan_style_scores.py).
+   These numbers are **not** official nuPlan benchmark scoring.
 
    During evaluation, the key values are printed as they are collected:
 
@@ -299,7 +299,7 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
    | Workflow | IDM | Zero | Poly | imitation |
    | --- | --- | --- | --- | --- |
    | `deploy` | rule policy | rule policy | checkpoint or random action | Pluto / Wayformer checkpoint |
-   | `evolution` | SAC | SAC | SAC | SAC + selected Agent |
+   | `evolution` | SAC | SAC | SAC | SAC + selected model |
 
    For `deploy + Poly`, an empty `workflow.policies.Poly.checkpoint` prints a
    warning and uses `action_space.sample()`. For `evolution + IDM/Zero/Poly`, an
@@ -375,9 +375,8 @@ Li, Quanyi and Peng, Zhenghao and Feng, Lan and Zhang, Qihang and Xue, Zhenghai 
 ## License
 
 The HEAD root [LICENSE](./LICENSE) is MIT. Integrated model code retains its
-upstream terms; see [source and license notices](head/agents/README.md#来源和许可证)
-and [the preserved AGPLv3 license](head/agents/common/LICENSE.AGPL). Directory
-renaming does not relicense third-party source or model checkpoints.
+[upstream terms](head/model/common/LICENSE) and [AGPLv3 license](head/model/common/LICENSE.AGPL).
+Model weights remain subject to their providers' terms.
 
 ## Project Structure
 
@@ -388,7 +387,7 @@ metrics are kept under `artifacts/` and are not source files.
 ```text
 HEAD/
 ├── head/
-│   ├── agents/                  # shared contract + one directory per algorithm
+│   ├── model/                   # shared contract + one directory per algorithm
 │   │   ├── base.py / loader.py  # typed I/O and convention-based discovery
 │   │   ├── common/             # shared feature utilities and upstream licenses
 │   │   ├── pluto/              # network, feature builder, config, adapter

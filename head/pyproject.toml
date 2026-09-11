@@ -24,9 +24,9 @@ namespaces = true
 [tool.setuptools.package-data]
 head = [
     "configs/*.yaml",
-    "agents/**/*.yaml",
-    "agents/**/LICENSE*",
-    "agents/**/*.md",
+    "model/**/*.yaml",
+    "model/**/LICENSE*",
+    "model/**/*.md",
     "configs/tasks/*.yaml",
     "policy/evolvable_policy/common/cfgs/*.yaml"
 ]

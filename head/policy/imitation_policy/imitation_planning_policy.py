@@ -40,8 +40,8 @@ class ImitationPlanningPolicy(BasePolicy):
             imitation_cfg, checkpoint, device=self.device,
             controller_dt=self.controller.dt,
         )
-        self._model = self._inference.agent.model
-        self.warmup_steps = max(self.warmup_steps, self._inference.agent.history_steps)
+        self._model = self._inference.adapter.model
+        self.warmup_steps = max(self.warmup_steps, self._inference.adapter.history_steps)
         # Episode horizon is not the network prediction window.
         limit = imitation_cfg.get("max_closed_loop_steps", None)
         self.max_closed_loop_steps = int(

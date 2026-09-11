@@ -22,7 +22,7 @@ workflow:
     Poly:
       checkpoint: auto       # Standard task/map/train_name SAC directory
     imitation:
-      model: wayformer       # head.agents.<model>.agent:Agent, or package.module:Class
+      model: wayformer       # head.model.<model>.adapter:Adapter, or package.module:Class
       source: null           # legacy checkpoint search path only; no code injection
       options: {}            # overrides for the model's own config.yaml
       max_closed_loop_steps: 120

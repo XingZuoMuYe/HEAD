@@ -1,12 +1,5 @@
-"""
-Author: ShuaixiPan
-Date: 2025-09-11
-Description: Map related utility functions for processing polylines and map data.
-"""
-
 import numpy as np
 from head.model.common import common_utils
-
 
 def get_map_data(config, center_objects, map_infos):
     num_center_objects = center_objects.shape[0]

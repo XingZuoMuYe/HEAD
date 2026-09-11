@@ -128,8 +128,8 @@ def validate_config(args):
                 "with scenario.capabilities.closed_loop_imitation=true"
             )
         model = imitation.get("model")
-        from head.agents import get_agent_class
-        get_agent_class(model)  # Lazy discovery, no per-model allow-list.
+        from head.model import get_adapter_class
+        get_adapter_class(model)  # Lazy discovery, no per-model allow-list.
         if not imitation.get("checkpoint"):
             raise ValueError("workflow.policies.imitation.checkpoint is required")
         if int(imitation.get("warmup_steps", 0)) < 0:

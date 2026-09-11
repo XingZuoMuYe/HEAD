@@ -1,21 +1,10 @@
+# 日志转场景
 
-# Scenario_reproduction / rosbag_pkl / data_convert.py
-data_convert.py为将rosbag文件转换为pkl文件的主要脚本。它读取rosbag文件中的车辆和行人信息，并将其存储为pkl文件，以便在后续的自学习循环中使用。
-![](./assets/HEAD.jpg)
-## 🔧Quick Start
-1. **运行data_convert.py，其内部会依次调用"osm_scenario.py", "obj_info.py", "dataset_summary.py"文件**
+将实车日志中的车辆、行人信息与 OSM 地图整理为 pkl 场景数据。
 
-
-2. **osm_scenario.py从osm文件获取地图信息**
-
-
-3. **obj_info.py从rosbag文件获取车辆和行人信息**
-
-
-4. **dataset_summary.py将上述信息转换为pkl文件**
-
-
-5. **metadrive渲染命令**
-```bash
-python -m scenarionet.sim -d /path_to_your scenario_reproduction/dataset --render 2D/3D
-```
+| 文件 | 用途 |
+| --- | --- |
+| [data_convert.py](data_convert.py) | 数据转换入口 |
+| [util/osm_scenario.py](util/osm_scenario.py) | 地图处理 |
+| [util/obj_info.py](util/obj_info.py) | 车辆与行人信息处理 |
+| [util/dataset_summary.py](util/dataset_summary.py) | 场景数据整理与输出 |

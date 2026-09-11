@@ -1,8 +1,8 @@
 import numpy as np
 
 from head.policy.imitation_policy.trajectory_controller import TrajectoryController
-from head.agents import AgentInput, Trajectory, get_agent_class
-from head.agents.pluto.agent import Agent as PlutoAgent
+from head.model import ModelInput, Trajectory, get_adapter_class
+from head.model.pluto.adapter import Adapter as PlutoAdapter
 
 
 def test_trajectory_controller_returns_bounded_action():
@@ -30,18 +30,18 @@ def test_trajectory_controller_steers_toward_lateral_path_error():
     assert right_action[0] < 0.0
 
 
-def test_agent_name_validation():
+def test_adapter_name_validation():
     try:
-        get_agent_class("missing_agent")
+        get_adapter_class("missing_adapter")
     except ValueError as exc:
-        assert "Unknown agent" in str(exc)
+        assert "Unknown adapter" in str(exc)
     else:
-        raise AssertionError("invalid agent should be rejected")
+        raise AssertionError("invalid adapter should be rejected")
 
 
 def test_pluto_and_wayformer_are_discoverable():
-    assert get_agent_class("pluto").load_config().dim == 128
-    assert get_agent_class("wayformer").load_config().hidden_size == 256
+    assert get_adapter_class("pluto").load_config().dim == 128
+    assert get_adapter_class("wayformer").load_config().hidden_size == 256
 
 
 def test_pluto_adapter_uses_velocity_columns():
@@ -53,9 +53,9 @@ def test_pluto_adapter_uses_velocity_columns():
             trajectory[0, :, 4:6] = [3.0, 4.0]
             return trajectory, None, None, {}
 
-    adapter = PlutoAgent({})
+    adapter = PlutoAdapter({})
     adapter.engine = FakeEngine()
-    trajectory = adapter.compute_trajectory(AgentInput({}, 21)).samples
+    trajectory = adapter.compute_trajectory(ModelInput({}, 21)).samples
     assert trajectory.shape == (4, 4)
     np.testing.assert_allclose(
         trajectory[:, 2:4], np.tile([3.0, 4.0], (4, 1))
@@ -69,7 +69,7 @@ def test_pluto_control_position_uses_rear_axle():
 
 
 def test_pluto_collision_scoring_converts_rear_axle_to_vehicle_center():
-    from head.agents.pluto.trajectory_evaluator import TrajectoryEvaluator
+    from head.model.pluto.trajectory_evaluator import TrajectoryEvaluator
 
     trajectory = np.zeros((1, 4, 2), dtype=np.float32)
     yaw = np.zeros((1, 4), dtype=np.float32)

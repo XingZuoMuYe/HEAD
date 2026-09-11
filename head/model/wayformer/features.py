@@ -1,68 +1,80 @@
 import time
+from collections import defaultdict
+from torch.utils.data import Dataset
 import os
 os.environ["MPLBACKEND"] = "Agg"   # 离线保存最稳
-from datetime import datetime
 import torch
-# main_head.py
-from collections import defaultdict
-from head.manager.config_manager import get_final_config
-from head.manager.imitation_selector import resolve_imitation_strategy
-from head.evolution_engine.env_builder.env import make_env
-
-
-from head.model.common.common_utils import get_polyline_dir, find_true_segments, generate_mask, is_ddp, \
-    get_kalman_difficulty, get_trajectory_type, interpolate_polyline
+from head.model.common.common_utils import get_polyline_dir, generate_mask, get_kalman_difficulty, get_trajectory_type, interpolate_polyline
 import numpy as np
 from metadrive.scenario.scenario_description import MetaDriveType
 from head.model.common.my_types import object_type, polyline_type
-default_value = 0
+from head.model.wayformer.map_utils import get_map_data, get_manually_split_map_data
+from head.model.wayformer.agent_utils import get_agent_data, get_interested_agents, trajectory_filter
 
+default_value = 0
 object_type = defaultdict(lambda: default_value, object_type)
 polyline_type = defaultdict(lambda: default_value, polyline_type)
 
-from head.policy.imitation_policy.utils.map_utils import get_map_data, get_manually_split_map_data
-from head.policy.imitation_policy.utils.agent_utils import transform_trajs_to_center_coords, get_agent_data, get_interested_agents, trajectory_filter
 
-class UnitrajInference:
-    def __init__(self, cfg, device=None):
+def create_batch_dict(ret_list):
+    """Create batch dictionary from list of processed data."""
+    batch_size = len(ret_list)
+    key_to_list = {}
+    for key in ret_list[0].keys():
+        key_to_list[key] = [ret_list[bs_idx][key] for bs_idx in range(batch_size)]
+
+    input_dict = {}
+    for key, val_list in key_to_list.items():
+        try:
+            input_dict[key] = torch.from_numpy(np.stack(val_list, axis=0))
+        except:
+            input_dict[key] = val_list
+
+    return {'batch_size': batch_size, 'input_dict': input_dict, 'batch_sample_count': batch_size}
+
+
+class UnitrajTestDataset(Dataset):
+    def __init__(self, cfg):
         self.global_cfg = cfg
-        self.imitation_algo = None
-        self.env = None
-        self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
 
-    def init_env_and_model(self,env, model):
-        """Initialize the imitation model and environment."""
-        self.env = env
-        self.imitation_algo = model
+    def process_scenario(self, scenario, current_step):
+        t1 = time.time()
+        info = self.process_scenario_data(scenario, current_step)
+        t2 = time.time()
+        ret_list = self.prepare_agent_and_map_data(info)
+        batch_dict = create_batch_dict(ret_list)
 
-    def process_scenario_data(self, scenario):
+        return batch_dict, self.center_objects
+
+    def process_scenario_data(self, scenario, current_step):
         """Process scenario data to extract track and map information."""
         traffic_lights = scenario['dynamic_map_states']
         tracks = scenario['tracks']
-        map_feat = scenario['map_features']
 
+        # 改变时间逻辑，滑动更新
         past_length = self.global_cfg['past_len']
         future_length = self.global_cfg['future_len']
-        total_steps = past_length + future_length
+        # The network window size is not the closed-loop episode horizon.
+        # Keep the historical prefix unchanged, but retain the current frame
+        # after index80 instead of indexing outside an81-frame array.
+        total_steps = max(past_length + future_length, int(current_step) + 1)
         starting_frame = 0
         ending_frame = starting_frame + total_steps
         trajectory_sample_interval = self.global_cfg['trajectory_sample_interval']
         frequency_mask = generate_mask(past_length - 1, total_steps, trajectory_sample_interval)
-
         track_infos = self.extract_track_infos(tracks, starting_frame, ending_frame, total_steps, frequency_mask)
-        scenario['metadata']['ts'] = scenario['metadata']['ts'][:total_steps]
-
-        map_infos = self.extract_map_infos(map_feat)
+        map_infos, cached = self.get_cached_map_infos(scenario)
         dynamic_map_infos = self.extract_dynamic_map_infos(traffic_lights, total_steps)
-
         ret = {
             'track_infos': track_infos,
             'dynamic_map_infos': dynamic_map_infos,
             'map_infos': map_infos
         }
         ret.update(scenario['metadata'])
-        ret['timestamps_seconds'] = ret.pop('ts')
-        ret['current_time_index'] = self.global_cfg['past_len'] - 1
+        # Never truncate the live simulator's metadata in place: later calls
+        # need timestamps beyond the first prediction window.
+        ret['timestamps_seconds'] = ret.pop('ts')[:total_steps]
+        ret['current_time_index'] = current_step
         ret['sdc_track_index'] = track_infos['object_id'].index(ret['sdc_id'])
 
         ret = self.prepare_tracks_to_predict(ret, track_infos)
@@ -76,7 +88,10 @@ class UnitrajInference:
         track_infos = {'object_id': [], 'object_type': [], 'trajs': []}
         for k, v in tracks.items():
             state = v['state']
+
             for key in state:
+                if isinstance(state[key], list):
+                    state[key] = np.array(state[key])
                 if len(state[key].shape) == 1:
                     state[key] = np.expand_dims(state[key], axis=-1)
             all_state = np.concatenate([
@@ -130,12 +145,44 @@ class UnitrajInference:
         map_infos['all_polylines'] = polylines
         return map_infos
 
+    # ========== 地图缓存辅助函数 ==========
+    def get_cached_map_infos(self, scenario):
+        """从缓存中获取或构建地图信息"""
+        scenario_id = scenario["metadata"].get("scenario_id", None)
+        map_feat = scenario["map_features"]
+
+        # 首次使用该类时可能没有缓存属性
+        if not hasattr(self, "map_cache"):
+            self.map_cache = {}
+
+        # 检查缓存命中
+        if scenario_id in self.map_cache:
+            # ✅ 命中缓存
+            # print(f"[MapCache] Hit for scenario: {scenario_id}")
+            return self.map_cache[scenario_id], True
+
+        # ❌ 缓存未命中 → 重新提取并存储
+        t0 = time.time()
+        map_infos = self.extract_map_infos(map_feat)
+        self.map_cache[scenario_id] = map_infos
+        # print(f"[MapCache] Built new map for {scenario_id}, time={time.time() - t0:.3f}s")
+
+        return map_infos, False
+
     def process_single_map_feature(self, v, polyline_type_):
         """Process a single map feature based on its type."""
-        cur_info = {'id': v.get('id', None), 'type': v['type']}
+        cur_info = {'id': v.get('id'), 'type': v['type']}
         polyline = None
-        if polyline_type_ in [1, 2, 3]:
-            cur_info.update({key: v.get(key, None) for key in ['speed_limit_mph', 'interpolating', 'entry_lanes']})
+
+        get_val = v.get
+        # --- Lane 类特征 ---
+        if polyline_type_ <= 3:  # [1, 2, 3]
+            cur_info.update({
+                'speed_limit_mph': get_val('speed_limit_mph'),
+                'interpolating': get_val('interpolating'),
+                'entry_lanes': get_val('entry_lanes'),
+            })
+
             try:
                 cur_info['left_boundary'] = [{'start_index': x['self_start_index'], 'end_index': x['self_end_index'],
                                               'feature_id': x['feature_id'], 'boundary_type': 'UNKNOWN'}
@@ -146,32 +193,46 @@ class UnitrajInference:
             except:
                 cur_info['left_boundary'] = []
                 cur_info['right_boundary'] = []
-            polyline = interpolate_polyline(v['polyline'])
-        elif polyline_type_ in [6, 7, 8, 9, 10, 11, 12, 13]:
-            polyline = interpolate_polyline(v.get('polyline', v.get('polygon', None)))
-        elif polyline_type_ in [15, 16]:
-            polyline = interpolate_polyline(v['polyline'])
-            cur_info['type'] = 7
-        elif polyline_type_ in [17]:
+
+            polyline_data = get_val('polyline')
+            if polyline_data is not None and len(polyline_data) > 1:
+                polyline = interpolate_polyline(polyline_data)
+            else:
+                polyline = np.asarray(polyline_data, dtype=np.float32)
+
+        # --- road_line / edge ---
+        elif 6 <= polyline_type_ <= 13:
+            polyline = interpolate_polyline(get_val('polyline', get_val('polygon')))
+
+        # --- special markings ---
+        elif 15 <= polyline_type_ <= 16:
+            polyline = interpolate_polyline(get_val('polyline'))
+            cur_info['type'] = 7  # 保留原行为
+
+        # --- stop_sign ---
+        elif polyline_type_ == 17:
             cur_info['lane_ids'] = v['lane']
             cur_info['position'] = v['position']
-            polyline = v['position'][np.newaxis]
-        elif polyline_type_ in [18, 19]:
-            polyline = v['polygon']
+            polyline = np.expand_dims(cur_info['position'], 0)
+
+        # --- crosswalk/polygon 类 ---
+        elif polyline_type_ in (18, 19):
+            polyline = np.array(v['polygon'], dtype=np.float32)
+
         return cur_info, polyline
+
 
     def get_map_category(self, polyline_type_):
         """Map polyline type to category string."""
-        if polyline_type_ in [1, 2, 3]:
-            return 'lane'
-        elif polyline_type_ in [6, 7, 8, 9, 10, 11, 12, 13, 15, 16]:
-            return 'road_line'
-        elif polyline_type_ in [17]:
-            return 'stop_sign'
-        elif polyline_type_ in [18, 19]:
-            return 'crosswalk'
-        else:
-            return 'others'
+        _category_map = {
+            **{k: 'lane' for k in [1, 2, 3]},
+            **{k: 'road_line' for k in [6, 7, 8, 9, 10, 11, 12, 13, 15, 16]},
+            17: 'stop_sign',
+            18: 'crosswalk',
+            19: 'crosswalk'
+        }
+        return _category_map.get(polyline_type_, 'others')
+
 
     def extract_dynamic_map_infos(self, traffic_lights, total_steps):
         """Extract dynamic map information (e.g., traffic lights)."""
@@ -179,7 +240,7 @@ class UnitrajInference:
         for k, v in traffic_lights.items():
             lane_id, state, stop_point = [], [], []
             for cur_signal in v['state']['object_state']:
-                lane_id.append(str(v['lane']) if v.get('lane')else k)
+                lane_id.append(str(v['lane']) if v.get('lane') else k)
                 state.append(cur_signal)
                 if type(v['stop_point']) == list:
                     stop_point.append(v['stop_point'])
@@ -195,7 +256,6 @@ class UnitrajInference:
 
     def prepare_tracks_to_predict(self, ret, track_infos):
         """Prepare tracks to predict based on configuration."""
-        self.global_cfg['only_train_on_ego']  = True # 在inference_engine的时候，只预测ego
         if self.global_cfg['only_train_on_ego']:
             tracks_to_predict = {
                 'track_index': [ret['sdc_track_index']],
@@ -208,7 +268,8 @@ class UnitrajInference:
             tracks_to_predict = {
                 'track_index': [track_infos['object_id'].index(id) for id in sample_list if
                                 id in track_infos['object_id']],
-                'object_type': [track_infos['object_type'][track_infos['object_id'].index(id)] for id in sample_list if
+                'object_type': [track_infos['object_type'][track_infos['object_id'].index(id)] for id in sample_list
+                                if
                                 id in track_infos['object_id']],
             }
         else:
@@ -217,7 +278,8 @@ class UnitrajInference:
             tracks_to_predict = {
                 'track_index': [track_infos['object_id'].index(id) for id in sample_list if
                                 id in track_infos['object_id']],
-                'object_type': [track_infos['object_type'][track_infos['object_id'].index(id)] for id in sample_list if
+                'object_type': [track_infos['object_type'][track_infos['object_id'].index(id)] for id in sample_list
+                                if
                                 id in track_infos['object_id']],
             }
         ret['tracks_to_predict'] = tracks_to_predict
@@ -228,19 +290,25 @@ class UnitrajInference:
         scene_id = info['scenario_id']
         sdc_track_index = info['sdc_track_index']
         current_time_index = info['current_time_index']
-        timestamps = np.array(info['timestamps_seconds'][:current_time_index + 1], dtype=np.float32)
+
+        timestamps = np.array(info['timestamps_seconds'][current_time_index - 21:current_time_index],
+                              dtype=np.float32)
         track_infos = info['track_infos']
         track_index_to_predict = np.array(info['tracks_to_predict']['track_index'])
         obj_types = np.array(track_infos['object_type'])
         obj_trajs_full = track_infos['trajs']
-        obj_trajs_past = obj_trajs_full[:, :current_time_index + 1]
-        obj_trajs_future = obj_trajs_full[:, current_time_index + 1:]
+        obj_trajs_past = obj_trajs_full[:, current_time_index - 21: current_time_index]
+        # print('last_po',obj_trajs_past[int(track_index_to_predict),-1:,:2])
+        obj_trajs_future = obj_trajs_full[:, current_time_index:]
+        # print('next_po', obj_trajs_future[int(track_index_to_predict), 0, :2])
 
         center_objects, track_index_to_predict = get_interested_agents(
             self.global_cfg, track_index_to_predict=track_index_to_predict,
             obj_trajs_full=obj_trajs_full, current_time_index=current_time_index,
             obj_types=obj_types, scene_id=scene_id
         )
+        self.center_objects = center_objects
+
         if center_objects is None:
             return None
 
@@ -321,58 +389,3 @@ class UnitrajInference:
             ret_dict['obj_trajs'][..., 27:29] = 0
         if 'heading' in masked_attributes:
             ret_dict['obj_trajs'][..., 23:25] = 0
-
-    def create_batch_dict(self, ret_list):
-        """Create batch dictionary from list of processed data."""
-        batch_size = len(ret_list)
-        key_to_list = {}
-        for key in ret_list[0].keys():
-            key_to_list[key] = [ret_list[bs_idx][key] for bs_idx in range(batch_size)]
-
-        input_dict = {}
-        for key, val_list in key_to_list.items():
-            try:
-                input_dict[key] = torch.from_numpy(np.stack(val_list, axis=0))
-            except:
-                input_dict[key] = val_list
-
-        return {'batch_size': batch_size, 'input_dict': input_dict, 'batch_sample_count': batch_size}
-
-    def run_inference_step(self, to_device_func):
-        """Run a single inference step and return the batch and prediction."""
-        t1 = time.time()
-
-        # 1. 取一个 scenario（这里先简单拿第一个）
-        scenario_data = self.env.engine.data_manager._scenarios
-        if not scenario_data:
-            print("[Inference] No scenario data available.")
-            return None, None
-
-        scenario = next(iter(scenario_data.values()))
-
-        # 2. 预处理场景数据
-        info = self.process_scenario_data(scenario)
-        t2 = time.time()
-
-        # 3. 构建 agent + map 输入
-        ret_list = self.prepare_agent_and_map_data(info)
-        if ret_list is None:
-            print("[Inference] prepare_agent_and_map_data returned None.")
-            return None, None
-
-        # 4. 组 batch，并丢到 device 上
-        batch_dict = self.create_batch_dict(ret_list)
-        batch_dict = to_device_func(batch_dict, self.device)
-        t3 = time.time()
-
-        # 5. 前向推理
-        prediction, loss = self.imitation_algo.forward(batch_dict)
-        t4 = time.time()
-
-        # 7. 打印时间信息（可选）
-        print(f"[Inference] 数据处理: {t2 - t1:.4f}s")
-        print(f"[Inference] 构建输入: {t3 - t2:.4f}s")
-        print(f"[Inference] 模型推理: {t4 - t3:.4f}s")
-        print(f"[Inference] 总耗时: {t4 - t1:.4f}s")
-
-        return batch_dict, prediction
