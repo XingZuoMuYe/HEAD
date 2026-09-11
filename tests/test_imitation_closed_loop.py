@@ -1,8 +1,8 @@
 import numpy as np
 
 from head.policy.imitation_policy.trajectory_controller import TrajectoryController
-from head.policy.imitation_policy.pluto_closed_loop_inference import PlutoClosedLoopInference
-from head.policy.imitation_policy.unitraj_loader import ensure_unitraj_path
+from head.agents import AgentInput, Trajectory, get_agent_class
+from head.agents.pluto.agent import Agent as PlutoAgent
 
 
 def test_trajectory_controller_returns_bounded_action():
@@ -30,19 +30,18 @@ def test_trajectory_controller_steers_toward_lateral_path_error():
     assert right_action[0] < 0.0
 
 
-def test_unitraj_source_validation(tmp_path):
-    missing = tmp_path / "missing"
+def test_agent_name_validation():
     try:
-        ensure_unitraj_path(missing)
-    except FileNotFoundError as exc:
-        assert "unitraj" in str(exc)
+        get_agent_class("missing_agent")
+    except ValueError as exc:
+        assert "Unknown agent" in str(exc)
     else:
-        raise AssertionError("invalid UniTraj source should be rejected")
+        raise AssertionError("invalid agent should be rejected")
 
 
-def test_vendored_pluto_source_is_available():
-    root = ensure_unitraj_path("vendor/unitraj_benchmark")
-    assert (root / "unitraj/models/pluto/pluto_model.py").is_file()
+def test_pluto_and_wayformer_are_discoverable():
+    assert get_agent_class("pluto").load_config().dim == 128
+    assert get_agent_class("wayformer").load_config().hidden_size == 256
 
 
 def test_pluto_adapter_uses_velocity_columns():
@@ -54,9 +53,9 @@ def test_pluto_adapter_uses_velocity_columns():
             trajectory[0, :, 4:6] = [3.0, 4.0]
             return trajectory, None, None, {}
 
-    adapter = PlutoClosedLoopInference.__new__(PlutoClosedLoopInference)
+    adapter = PlutoAgent({})
     adapter.engine = FakeEngine()
-    trajectory = adapter.predict({}, 21)
+    trajectory = adapter.compute_trajectory(AgentInput({}, 21)).samples
     assert trajectory.shape == (4, 4)
     np.testing.assert_allclose(
         trajectory[:, 2:4], np.tile([3.0, 4.0], (4, 1))
@@ -64,15 +63,13 @@ def test_pluto_adapter_uses_velocity_columns():
 
 
 def test_pluto_control_position_uses_rear_axle():
-    adapter = PlutoClosedLoopInference.__new__(PlutoClosedLoopInference)
-    adapter.rear_axle_to_center = 2.0
-    position = adapter.control_position([10.0, 5.0], 0.0)
+    trajectory = Trajectory(np.zeros((2, 2)), reference_offset=2.0)
+    position = trajectory.control_position([10.0, 5.0], 0.0)
     np.testing.assert_allclose(position[:2], [8.0, 5.0])
 
 
 def test_pluto_collision_scoring_converts_rear_axle_to_vehicle_center():
-    ensure_unitraj_path("vendor/unitraj_benchmark")
-    from unitraj.closeloop.pluto.trajectory_evaluator import TrajectoryEvaluator
+    from head.agents.pluto.trajectory_evaluator import TrajectoryEvaluator
 
     trajectory = np.zeros((1, 4, 2), dtype=np.float32)
     yaw = np.zeros((1, 4), dtype=np.float32)

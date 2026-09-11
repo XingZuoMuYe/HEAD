@@ -122,7 +122,7 @@ def test_pluto_is_accepted_on_recorded_scenarios(monkeypatch):
         "task=real_scenario-v0",
         "workflow.policy=imitation",
         "workflow.policies.imitation.model=pluto",
-        "workflow.policies.imitation.source=vendor/unitraj_benchmark",
+        "workflow.policies.imitation.source=null",
         "workflow.policies.imitation.checkpoint=artifacts/weights/imitation/pluto/pluto_1M_aux_cil.ckpt",
     )
     assert cfg.args.workflow.policies.imitation.model == "pluto"

@@ -24,6 +24,9 @@ psutil==6.1.1
 tensorboard==2.13.0
 wandb==0.19.3
 pytest==8.3.5
+einops==0.8.0
+h5py==3.11.0
+scenarionet @ git+https://github.com/metadriverse/scenarionet.git@d4acdb5f5a844744fc85cb2dc3880d7d4a6eb170
 
 # PyTorch/CUDA 12.1 build used by this project on Linux.
 torch==2.5.0+cu121

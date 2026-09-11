@@ -1,15 +1,13 @@
-"""MetaDrive ego policy for UniTraj closed-loop deployment."""
+"""Model-independent ego policy: history, planning, control and evaluation."""
 
 import numpy as np
 import torch
 from metadrive.policy.base_policy import BasePolicy
 from metadrive.scenario.parse_object_state import parse_object_state
 
-from .closed_loop_inference import UniTrajClosedLoopInference
-from .pluto_closed_loop_inference import PlutoClosedLoopInference
+from .closed_loop_inference import ClosedLoopInference
 from .trajectory_controller import TrajectoryController
 from head.manager.artifact_paths import resolve_imitation_checkpoint
-from head.manager.imitation_selector import resolve_imitation_strategy
 
 
 class ImitationPlanningPolicy(BasePolicy):
@@ -36,56 +34,18 @@ class ImitationPlanningPolicy(BasePolicy):
         self._initialize_model()
 
     def _initialize_model(self):
-        self._model, unitraj_cfg = resolve_imitation_strategy(self.head_cfg)
-        # UnitrajTestDataset slices a full past window ending at current_step.
-        self.warmup_steps = max(self.warmup_steps, int(unitraj_cfg.get("past_len", 21)))
-        self.max_closed_loop_steps = (
-            int(unitraj_cfg.get("past_len", 21))
-            + int(unitraj_cfg.get("future_len", 60))
-            - 1
-        )
-        # Dataset window length is not the simulator horizon. Keep historical
-        # default for existing pilots; explicit longer runs still cap by scene.
-        configured_limit = self.head_cfg.args.workflow.policies.imitation.get("max_closed_loop_steps", None)
-        if configured_limit is not None:
-            self.max_closed_loop_steps = int(configured_limit)
         imitation_cfg = self.head_cfg.args.workflow.policies.imitation
         checkpoint = resolve_imitation_checkpoint(self.head_cfg.args)
-        source = imitation_cfg.get("source", None)
-        loaded = torch.load(checkpoint, map_location=self.device, weights_only=False)
-        state_dict = loaded.get("state_dict") if isinstance(loaded, dict) else None
-        if state_dict is None:
-            raise ValueError(f"Invalid imitation checkpoint '{checkpoint}': expected 'state_dict'")
-        model_name = str(imitation_cfg.get("model", "")).lower()
-        if model_name == "pluto":
-            state_dict = {
-                (key[len("model."):] if key.startswith("model.") else key): value
-                for key, value in state_dict.items()
-            }
-            incompatible = self._model.load_state_dict(state_dict, strict=False)
-            if incompatible.missing_keys:
-                raise ValueError(f"Pluto checkpoint is missing weights: {incompatible.missing_keys}")
-            if incompatible.unexpected_keys:
-                print(f"[Pluto] ignored {len(incompatible.unexpected_keys)} unexpected checkpoint keys")
-        else:
-            self._model.load_state_dict(state_dict)
-        self._model.to(self.device).eval()
-        self.sae_experiment = None
-        sae_cfg = imitation_cfg.get("sae", {})
-        if sae_cfg.get("mode", "off") not in ("off", False):
-            if model_name != "pluto":
-                raise ValueError("SAE experiment currently supports Pluto only")
-            from head.research.pluto_sae import FeatureExperiment
-            self.sae_experiment = FeatureExperiment(sae_cfg, self._model, self.device)
-        inference_class = (
-            PlutoClosedLoopInference if model_name == "pluto"
-            else UniTrajClosedLoopInference
+        self._inference = ClosedLoopInference(
+            imitation_cfg, checkpoint, device=self.device,
+            controller_dt=self.controller.dt,
         )
-        self._inference = inference_class(
-            unitraj_cfg,
-            self._model,
-            source=source,
-            device=self.device,
+        self._model = self._inference.agent.model
+        self.warmup_steps = max(self.warmup_steps, self._inference.agent.history_steps)
+        # Episode horizon is not the network prediction window.
+        limit = imitation_cfg.get("max_closed_loop_steps", None)
+        self.max_closed_loop_steps = int(
+            limit if limit is not None else self.head_cfg.args.evaluation.max_steps
         )
 
     @property
@@ -135,9 +95,6 @@ class ImitationPlanningPolicy(BasePolicy):
             return None
         self._update_ego_history(time_index)
         if self._prediction is None or time_index % self.replan_frequency == 0:
-            if self.sae_experiment is not None:
-                scenario = self.engine.data_manager.current_scenario
-                self.sae_experiment.context = (str(scenario["id"]), time_index)
             self._prediction = self._inference.predict(self.engine.data_manager.current_scenario, time_index)
             self.controller.reset()
             self.control_object.plan_traj = self._prediction[:, :2]
@@ -158,3 +115,4 @@ class ImitationPlanningPolicy(BasePolicy):
     def before_reset(self):
         self._prediction = None
         self.controller.reset()
+        self._inference.reset()

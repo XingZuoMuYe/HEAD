@@ -24,7 +24,6 @@ VALID_TASKS = {
 VALID_BASE_POLICIES = {"IDM", "imitation", "Poly", "Zero"}
 VALID_WORKFLOWS = {"deploy", "evolution"}
 VALID_EVOLUTION_STRATEGIES = {("RLBoost", "SAC")}
-VALID_IMITATION_MODELS = {"wayformer", "pluto"}
 
 def to_dict(config):
     ans = dict()
@@ -129,12 +128,10 @@ def validate_config(args):
                 "with scenario.capabilities.closed_loop_imitation=true"
             )
         model = imitation.get("model")
-        if model not in VALID_IMITATION_MODELS:
-            raise ValueError("workflow.policies.imitation.model must be 'wayformer' or 'pluto'")
-        if not imitation.get("source") or not imitation.get("checkpoint"):
-            raise ValueError(
-                "workflow.policies.imitation.source and checkpoint are required"
-            )
+        from head.agents import get_agent_class
+        get_agent_class(model)  # Lazy discovery, no per-model allow-list.
+        if not imitation.get("checkpoint"):
+            raise ValueError("workflow.policies.imitation.checkpoint is required")
         if int(imitation.get("warmup_steps", 0)) < 0:
             raise ValueError("workflow.policies.imitation.warmup_steps must be non-negative")
         if int(imitation.get("replan_frequency", 1)) < 1:

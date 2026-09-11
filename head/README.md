@@ -4,6 +4,7 @@ HEAD 的核心源码：负责配置加载、场景构建、策略推理、车辆
 
 | 目录 | 用途 |
 | --- | --- |
+| [`agents/`](agents/README.md) | 每个模型一个目录；统一输入输出与动态加载 |
 | [`configs/`](configs/) | 默认配置与各类场景任务参数 |
 | [`envs/`](envs/) | MetaDrive 仿真环境与实车日志场景环境 |
 | [`component/`](component/) | 地图、车道、导航及交通灯组件 |

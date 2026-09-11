@@ -22,8 +22,10 @@ workflow:
     Poly:
       checkpoint: auto       # Standard task/map/train_name SAC directory
     imitation:
-      model: wayformer       # wayformer | pluto (vendored Pluto source is available)
-      source: vendor/unitraj_benchmark  # bundled UniTraj inference code
+      model: wayformer       # head.agents.<model>.agent:Agent, or package.module:Class
+      source: null           # legacy checkpoint search path only; no code injection
+      options: {}            # overrides for the model's own config.yaml
+      max_closed_loop_steps: 120
       checkpoint: artifacts/weights/imitation/wayformer/brier_fde=1.45.ckpt
                                # Relative to the project root
       closed_loop: true

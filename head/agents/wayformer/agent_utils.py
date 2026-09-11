@@ -1,9 +1,3 @@
-"""
-Author: ShuaixiPan
-Date: 2025-09-11
-Description: Agent related utility functions for processing agent data.
-"""
-
 import numpy as np
 from collections import defaultdict
 from head.agents.common import common_utils
@@ -89,7 +83,7 @@ def get_agent_data(
         object_heading_embedding,
         obj_trajs[:, :, :, 7:9],
         acce,
-    ], axis=-1)
+    ], axis=-1)  # [0:3] position (x, y, z)   [3:6] size (l, w, h) [6:11] type_onehot [11:33] time_onehot [33:35] heading_encoding [35:37] vx,vy [37:39] ax,ay
 
     obj_trajs_mask = obj_trajs[:, :, :, -1]
     obj_trajs_data[obj_trajs_mask == 0] = 0
@@ -228,3 +222,39 @@ def trajectory_filter(data):
             tracks_to_preidct[k] = {'track_index': idx, 'track_id': k, 'difficulty': 0, 'object_type': type}
 
         return tracks_to_preidct
+
+def pred_local_to_world(pred_trajs,  # (K,T,2|4)
+                        center_objects,  # (N,9) 世界系下 center 在 m 时刻的状态
+                        heading_index=6):  # center_objects 中 heading 的列号
+    """
+    把模型输出的局部轨迹转回世界坐标系
+    支持只转 (x,y) 或同时转 (x,y,vx,vy)
+    """
+    # 1. 提取 center 的世界位姿
+    center_xyz = center_objects[:, 0:2]  # (1,1,2)
+    center_heading = center_objects[:, heading_index]  # (1,1)
+
+    # 2. 旋转：先把局部 (x,y) 逆时针转 +center_heading
+    xy = pred_trajs[..., 0:2]
+    xy_world = rotate_points_along_z(xy, center_heading)  # 正向旋转
+    pred_trajs_world = pred_trajs.copy()
+    pred_trajs_world[..., 0:2] = xy_world
+
+    # 3. 平移：再加回 center 的世界坐标
+    pred_trajs_world[..., 0:2] += center_xyz
+
+    return pred_trajs_world
+
+
+def rotate_points_along_z(points, angle):
+    """
+    points: (..., 2)
+    angle:  (...)  弧度
+    return: (..., 2)
+    """
+    cosa, sina = np.cos(angle), np.sin(angle)
+    rot = np.stack([
+        cosa, -sina,
+        sina,  cosa
+    ], axis=-1).reshape(angle.shape + (2, 2))
+    return np.einsum('...ij,...j->...i', rot, points)

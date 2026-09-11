@@ -15,7 +15,7 @@ HEAD is a holistic suite of evolutionary autonomous driving software, based on t
 | --- | --- |
 | [`head/`](head/README.md) | 仿真、规划、车辆控制与模型评测 |
 | [`evaluation/`](evaluation/README.md) | 闭环评价指标与评分工具 |
-| [`vendor/`](vendor/README.md) | 第三方模型推理代码 |
+| [`head/agents/`](head/agents/README.md) | 统一算法接口：Pluto、WayFormer 及新模型接入 |
 | [`tests/`](tests/README.md) | 配置、策略、环境与评价测试 |
 | [`artifacts/`](artifacts/README.md) | 模型权重、日志与运行输出 |
 | [`assets/`](assets/README.md) | 项目图片与架构示意 |
@@ -34,21 +34,20 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
    cd HEAD
    ```
 
-2. **Create and activate a virtual environment**
+2. **Create and activate a Conda environment**
 
-   `uv venv` must target a directory that does not replace the repository itself.
+   All environment creation and dependency installation must use Conda;
+   pip below runs inside the activated Conda environment, not system Python.
 
    ```bash
-   python3 -m pip install --upgrade uv
-   uv venv --python 3.9 .venv
-   source .venv/bin/activate
-   export LD_LIBRARY_PATH=
-   export CUDA_HOME=
-   uv pip install -r requirements.txt
+   conda create -n head python=3.10 -y
+   conda activate head
+   python -m pip install -r requirements.txt
    ```
 
-   `requirements.txt` installs the core MetaDrive and RLBoost dependencies. Optional
-   Waymo and UniTraj dependencies are not included.
+   The inference dependencies for Pluto and WayFormer are included. No separate
+   UniTraj checkout, Lightning training environment or torch-geometric is needed
+   for these two inference adapters.
 
 3. **PyTorch/CUDA compatibility**
 
@@ -168,7 +167,7 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
          checkpoint: auto
        imitation:
          model: pluto            # pluto | wayformer
-         source: vendor/unitraj_benchmark
+         options: {}            # optional model-specific overrides
          checkpoint: artifacts/weights/imitation/pluto/pluto_1M_aux_cil.ckpt
    ```
 
@@ -177,16 +176,24 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
    | `deploy` | `IDM`, `imitation`, `Poly`, `Zero` |
    | `evolution` | `IDM`, `imitation`, `Poly`, `Zero` |
 
-   Before selecting imitation learning, install the benchmark-specific packages:
+   Each algorithm lives under [head/agents/](head/agents/README.md):
 
-   ```bash
-   uv pip install lightning pytorch-lightning hydra-core easydict einops h5py torch-geometric
-   uv pip install scenarionet
-   ```
+   | Model | Implementation | Input/output adapter | Configuration |
+   | --- | --- | --- | --- |
+   | Pluto | [network](head/agents/pluto/model/pluto_model.py) | [Agent](head/agents/pluto/agent.py) | [config.yaml](head/agents/pluto/config.yaml) |
+   | WayFormer | [network](head/agents/wayformer/model.py) | [Agent](head/agents/wayformer/agent.py) | [config.yaml](head/agents/wayformer/config.yaml) |
 
-   The UniTraj inference code for both models ships with this repository at
-   `vendor/unitraj_benchmark`, so `workflow.policies.imitation.source` needs no
-   external checkout. Model weights are **not** in git — download them first:
+   Both use the same [closed-loop inference entry](head/policy/imitation_policy/closed_loop_inference.py),
+   controller and evaluation. New algorithms implement the Agent interface in
+   their own directory; no central model switch or registry edit is required.
+   See [the integration guide](head/agents/README.md) for the input/output contract.
+
+   **Legacy Pluto limitation:** its route builder uses the full recorded ego
+   path, including future positions (`input_scope=legacy_logged_route`).
+   This refactor preserves that existing protocol; these results must not be
+   described as strictly history-only. See [details](head/agents/pluto/README.md).
+
+   Model weights are **not** in git — download them first:
 
    ```bash
    # Wayformer
@@ -230,12 +237,12 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
    ```bash
    export LD_LIBRARY_PATH=
    export CUDA_HOME=
-   uv run python -m head.scripts.main_head \
+   python -m head.scripts.main_head \
      task=real_scenario-v0 \
      workflow.type=deploy \
      workflow.policy=imitation \
      runtime.device=auto \
-     simulation.render=false
+     simulation.render=false evaluation.max_steps=120
    ```
 
    That runs the configured default. To switch models, override two values:
@@ -247,9 +254,12 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
 
    Pluto executes the network's top-1 trajectory by default
    (`trajectory_selection_mode: neural_only` in
-   `vendor/unitraj_benchmark/unitraj/configs/method/Pluto.yaml`); the rule-based
+   `head/agents/pluto/config.yaml`); the rule-based
    evaluator is not constructed at all. Set it to `hybrid` to re-score
-   candidates with the rule-based evaluator instead.
+   candidates with the rule-based evaluator instead. WayFormer selects the
+   highest network-probability mode, not the first output mode. The episode
+   limit (default 120 frames) is independent of either network prediction window;
+   early termination still shortens the actual evaluated history.
 
    `imitation` is only accepted when the selected task configuration
    declares `scenario.capabilities.closed_loop_imitation: true`. Generated-road
@@ -289,7 +299,7 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
    | Workflow | IDM | Zero | Poly | imitation |
    | --- | --- | --- | --- | --- |
    | `deploy` | rule policy | rule policy | checkpoint or random action | Pluto / Wayformer checkpoint |
-   | `evolution` | SAC | SAC | SAC | SAC + UniTraj |
+   | `evolution` | SAC | SAC | SAC | SAC + selected Agent |
 
    For `deploy + Poly`, an empty `workflow.policies.Poly.checkpoint` prints a
    warning and uses `action_space.sample()`. For `evolution + IDM/Zero/Poly`, an
@@ -364,7 +374,10 @@ Li, Quanyi and Peng, Zhenghao and Feng, Lan and Zhang, Qihang and Xue, Zhenghai 
 
 ## License
 
-All assets and code are under the [Apache 2.0 license](./LICENSE) unless specified otherwise.
+The HEAD root [LICENSE](./LICENSE) is MIT. Integrated model code retains its
+upstream terms; see [source and license notices](head/agents/README.md#来源和许可证)
+and [the preserved AGPLv3 license](head/agents/common/LICENSE.AGPL). Directory
+renaming does not relicense third-party source or model checkpoints.
 
 ## Project Structure
 
@@ -375,6 +388,11 @@ metrics are kept under `artifacts/` and are not source files.
 ```text
 HEAD/
 ├── head/
+│   ├── agents/                  # shared contract + one directory per algorithm
+│   │   ├── base.py / loader.py  # typed I/O and convention-based discovery
+│   │   ├── common/             # shared feature utilities and upstream licenses
+│   │   ├── pluto/              # network, feature builder, config, adapter
+│   │   └── wayformer/          # network, feature builder, config, adapter
 │   ├── configs/                 # default.yaml and per-task YAML files
 │   ├── envs/                    # generated and recorded MetaDrive environments
 │   ├── evolution_engine/        # environment builder and RLBoost/SAC
@@ -387,11 +405,10 @@ HEAD/
 │   ├── policy/
 │   │   ├── basic_policy/        # IDM and Zero
 │   │   ├── evolvable_policy/    # Poly and local planner
-│   │   └── imitation_policy/    # Pluto / Wayformer inference and controller
+│   │   └── imitation_policy/    # one inference entry + shared controller
 │   ├── renderer/
 │   └── scripts/main_head.py     # closed-loop entry point
 ├── evaluation/                 # closed-loop metric definitions (single source)
-├── vendor/unitraj_benchmark/   # bundled UniTraj inference code for both models
 ├── tests/                      # configuration, environment, policy, metrics tests
 ├── artifacts/                  # generated eval/closed_loop and logs; weights are downloaded
 ├── assets/                     # figures and project images

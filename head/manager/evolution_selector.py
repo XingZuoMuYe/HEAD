@@ -156,7 +156,7 @@ class NoEvolutionStrategy:
 class ImitationStrategy(NoEvolutionStrategy):
     """
     模仿学习策略类,用于加载和运行模仿学习模型。
-    注意: 实际的eval逻辑需要参考UnitrajInference类实现完整的数据处理和推理流程。
+    模型专用处理由 head.agents 下的适配器负责，公共流程无需判断模型名称。
     """
 
     def __init__(self, cfg):
@@ -193,8 +193,8 @@ class ImitationStrategy(NoEvolutionStrategy):
     def eval(self):
         """
         执行模仿学习评估
-        注意: 这里只是占位实现,完整的实现需要参考UnitrajInference类,
-        包括scenario数据处理、agent和map数据准备、batch创建等步骤。
+        仿真状态由统一 Agent 接口完成输入处理与推理，公共控制器执行轨迹，
+        evaluation 记录实际闭环表现；此处不包含模型专用逻辑。
         """
         if self.env is None:
             print("[警告] 环境或模型未初始化,请先调用agent_initialize()")
