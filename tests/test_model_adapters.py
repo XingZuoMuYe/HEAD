@@ -8,8 +8,8 @@ import pytest
 import torch
 from omegaconf import OmegaConf
 
-from head.model import ModelInput, BaseAdapter, Trajectory, create_adapter, get_adapter_class
-from head.model.wayformer.adapter import Adapter as WayformerAdapter
+from head.model.imitation import ModelInput, BaseAdapter, Trajectory, create_adapter, get_adapter_class
+from head.model.imitation.wayformer.adapter import Adapter as WayformerAdapter
 from head.policy.imitation_policy.closed_loop_inference import ClosedLoopInference
 
 
@@ -30,7 +30,7 @@ class ToyAdapter(BaseAdapter):
 
 
 def test_new_algorithm_needs_no_core_changes(monkeypatch, tmp_path):
-    module = types.ModuleType("head.model.toy.adapter")
+    module = types.ModuleType("head.model.imitation.toy.adapter")
     module.Adapter = ToyAdapter
     monkeypatch.setitem(sys.modules, module.__name__, module)
     checkpoint = tmp_path / "toy.weights"
@@ -42,7 +42,7 @@ def test_new_algorithm_needs_no_core_changes(monkeypatch, tmp_path):
     inference.reset()
     assert inference.trajectory is None
     assert inference.adapter.resets == 1
-    assert get_adapter_class("head.model.toy.adapter:Adapter") is ToyAdapter
+    assert get_adapter_class("head.model.imitation.toy.adapter:Adapter") is ToyAdapter
     # Config validation also has no hard-coded model allow-list.
     from head.manager.config_manager import get_final_config
     monkeypatch.setattr(sys, "argv", ["main_head.py", "task=real_scenario-v0",
@@ -123,16 +123,16 @@ def test_nonfinite_probability_rejected():
 
 def test_importing_adapters_does_not_import_networks():
     import subprocess
-    code = ("import sys; from head.model import get_adapter_class; "
+    code = ("import sys; from head.model.imitation import get_adapter_class; "
             "get_adapter_class('pluto'); get_adapter_class('wayformer'); "
-            "assert 'head.model.wayformer.model' not in sys.modules; "
-            "assert 'head.model.pluto.model.pluto_model' not in sys.modules")
+            "assert 'head.model.imitation.wayformer.model' not in sys.modules; "
+            "assert 'head.model.imitation.pluto.model.pluto_model' not in sys.modules")
     subprocess.run([sys.executable, "-c", code], check=True)
 
 
 def test_no_hidden_external_checkout_imports():
     root = Path(__file__).parents[1]
-    for parent in [root / "head/model", root / "head/policy/imitation_policy"]:
+    for parent in [root / "head/model/imitation", root / "head/policy/imitation_policy"]:
         for path in parent.rglob("*.py"):
             text = path.read_text()
             assert "from unitraj." not in text, path
@@ -140,11 +140,11 @@ def test_no_hidden_external_checkout_imports():
             assert "imitation_policy.UniTraj" not in text, path
             assert "head.agents" not in text, path
     for model in ("pluto", "wayformer"):
-        directory = root / "head/model" / model
+        directory = root / "head/model/imitation" / model
         assert (directory / "adapter.py").is_file()
         assert not (directory / "agent.py").exists()
         assert get_adapter_class(model).__name__ == "Adapter"
-        assert get_adapter_class(model).__module__ == f"head.model.{model}.adapter"
+        assert get_adapter_class(model).__module__ == f"head.model.imitation.{model}.adapter"
     assert not (root / "head/policy/imitation_policy/pluto_closed_loop_inference.py").exists()
 
 
@@ -156,7 +156,7 @@ def test_pluto_neural_only_is_default():
 
 
 def test_scalar_normalization_does_not_change_source():
-    from head.model.common.scenario import normalize_scalar_states
+    from head.model.imitation.common.scenario import normalize_scalar_states
     values = np.arange(3).reshape(-1, 1)
     scenario = {"tracks": {"ego": {"state": {"heading": values}}}}
     normalized = normalize_scalar_states(scenario)

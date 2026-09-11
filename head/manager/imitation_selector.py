@@ -1,6 +1,6 @@
 """Compatibility bare-network builder using the pluggable adapter contract."""
 from omegaconf import OmegaConf
-from head.model import get_adapter_class
+from head.model.imitation import get_adapter_class
 
 
 def resolve_imitation_strategy(cfg):

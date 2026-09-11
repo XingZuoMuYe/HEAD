@@ -1,8 +1,8 @@
 import numpy as np
 
 from head.policy.imitation_policy.trajectory_controller import TrajectoryController
-from head.model import ModelInput, Trajectory, get_adapter_class
-from head.model.pluto.adapter import Adapter as PlutoAdapter
+from head.model.imitation import ModelInput, Trajectory, get_adapter_class
+from head.model.imitation.pluto.adapter import Adapter as PlutoAdapter
 
 
 def test_trajectory_controller_returns_bounded_action():
@@ -69,7 +69,7 @@ def test_pluto_control_position_uses_rear_axle():
 
 
 def test_pluto_collision_scoring_converts_rear_axle_to_vehicle_center():
-    from head.model.pluto.trajectory_evaluator import TrajectoryEvaluator
+    from head.model.imitation.pluto.trajectory_evaluator import TrajectoryEvaluator
 
     trajectory = np.zeros((1, 4, 2), dtype=np.float32)
     yaw = np.zeros((1, 4), dtype=np.float32)

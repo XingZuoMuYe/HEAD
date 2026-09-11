@@ -1,46 +1,40 @@
-"""Convention-based lazy discovery: head.model.<name>.adapter:Adapter."""
+"""Lazy strategy-family discovery and trajectory-model compatibility exports."""
 import importlib
 import re
-from omegaconf import OmegaConf
-from .base import BaseAdapter
+from .base import BasePolicyAdapter, PolicyBinding
+from .imitation.loader import create_adapter, get_adapter_class
 
 
-def get_adapter_class(name):
-    """Also accept 'my_package.my_adapter:MyAdapter' for external plugins."""
+def get_policy_adapter(name):
     if not isinstance(name, str) or not name.strip():
-        raise ValueError("workflow.policies.imitation.model must name an adapter")
+        raise ValueError("workflow.policy must name a strategy family")
     if ":" in name:
         module_name, class_name = name.split(":", 1)
     else:
         if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", name):
-            raise ValueError(f"Invalid adapter name: {name!r}")
+            raise ValueError(f"Invalid workflow.policy {name!r}")
         module_name, class_name = f"head.model.{name.lower()}.adapter", "Adapter"
     try:
         module = importlib.import_module(module_name)
     except ModuleNotFoundError as exc:
         if exc.name == module_name or module_name.startswith(exc.name + "."):
             raise ValueError(
-                f"Unknown adapter {name!r}. Add head/model/<name>/adapter.py with "
-                "an Adapter class, or use package.module:ClassName."
+                f"Unknown workflow.policy {name!r}; add head/model/<family>/adapter.py"
             ) from exc
         raise
     cls = getattr(module, class_name, None)
-    if not isinstance(cls, type) or not issubclass(cls, BaseAdapter):
-        raise TypeError(f"{module_name}:{class_name} must inherit BaseAdapter")
+    if not isinstance(cls, type) or not issubclass(cls, BasePolicyAdapter):
+        raise TypeError(f"{module_name}:{class_name} must inherit BasePolicyAdapter")
     return cls
 
 
-def create_adapter(imitation_config, checkpoint, device="cpu"):
-    cls = get_adapter_class(str(imitation_config.model))
-    config = OmegaConf.merge(cls.load_config(), imitation_config.get("options", {}))
-    config["sae"] = OmegaConf.to_container(imitation_config.get("sae", OmegaConf.create({})))
-    adapter = cls(config, device=device)
-    adapter.initialize(checkpoint)
-    if adapter.input_scope != "history_only":
-        import warnings
-        warnings.warn(
-            f"Adapter input scope: {adapter.input_scope}. This legacy adapter can "
-            "use recorded future context; do not label it history-only evaluation.",
-            UserWarning,
-        )
-    return adapter
+def resolve_policy_binding(cfg):
+    mode = cfg.args.workflow.type
+    if mode == "evo":
+        mode = "evolution"
+    if mode not in {"deploy", "evolution"}:
+        raise ValueError("workflow.type must be 'deploy' or 'evolution'")
+    binding = get_policy_adapter(cfg.args.workflow.policy).resolve(cfg.args, mode)
+    if not isinstance(binding, PolicyBinding):
+        raise TypeError("Strategy Adapter.resolve must return PolicyBinding")
+    return binding

@@ -10,11 +10,11 @@ from head.manager.imitation_selector import resolve_imitation_strategy
 from head.evolution_engine.env_builder.env import make_env
 
 
-from head.model.common.common_utils import get_polyline_dir, find_true_segments, generate_mask, is_ddp, \
+from head.model.imitation.common.common_utils import get_polyline_dir, find_true_segments, generate_mask, is_ddp, \
     get_kalman_difficulty, get_trajectory_type, interpolate_polyline
 import numpy as np
 from metadrive.scenario.scenario_description import MetaDriveType
-from head.model.common.my_types import object_type, polyline_type
+from head.model.imitation.common.my_types import object_type, polyline_type
 default_value = 0
 
 object_type = defaultdict(lambda: default_value, object_type)

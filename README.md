@@ -19,7 +19,7 @@ HEAD is a holistic suite of evolutionary autonomous driving software, based on t
 | --- | --- |
 | [`head/`](head/README.md) | 仿真、规划、车辆控制与模型评测 |
 | [`evaluation/`](evaluation/README.md) | 闭环评价指标与评分工具 |
-| [`head/model/`](head/model/README.md) | 统一算法接口：Pluto、WayFormer 及新模型接入 |
+| [`head/model/`](head/model/README.md) | imitation、Poly、Zero、IDM 策略及模型接入 |
 | [`tests/`](tests/README.md) | 配置、策略、环境与评价测试 |
 | [`artifacts/`](artifacts/README.md) | 模型权重、日志与运行输出 |
 | [`assets/`](assets/README.md) | 项目图片与架构示意 |
@@ -78,10 +78,10 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
    ```bash
    sudo apt-get update
    sudo apt-get install -y build-essential cmake libeigen3-dev pybind11-dev
-   cmake -S head/policy/evolvable_policy/common/local_planner \
-         -B head/policy/evolvable_policy/common/local_planner/build \
+   cmake -S head/model/poly/common/local_planner \
+         -B head/model/poly/common/local_planner/build \
          -DCMAKE_BUILD_TYPE=Release
-   cmake --build head/policy/evolvable_policy/common/local_planner/build \
+   cmake --build head/model/poly/common/local_planner/build \
          --parallel
    ```
 
@@ -180,16 +180,24 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
    | `deploy` | `IDM`, `imitation`, `Poly`, `Zero` |
    | `evolution` | `IDM`, `imitation`, `Poly`, `Zero` |
 
-   Each algorithm lives under [head/model/](head/model/README.md):
+   Strategy families live under [head/model/](head/model/README.md).
+   Select a family with `workflow.policy=imitation|Poly|Zero|IDM`.
+   For imitation, select its model with `workflow.policies.imitation.model=pluto|wayformer`:
 
    | Model | Implementation | Input/output adapter | Configuration |
    | --- | --- | --- | --- |
-   | Pluto | [network](head/model/pluto/model/pluto_model.py) | [Adapter](head/model/pluto/adapter.py) | [config.yaml](head/model/pluto/config.yaml) |
-   | WayFormer | [network](head/model/wayformer/model.py) | [Adapter](head/model/wayformer/adapter.py) | [config.yaml](head/model/wayformer/config.yaml) |
+   | Pluto | [network](head/model/imitation/pluto/model/pluto_model.py) | [Adapter](head/model/imitation/pluto/adapter.py) | [config.yaml](head/model/imitation/pluto/config.yaml) |
+   | WayFormer | [network](head/model/imitation/wayformer/model.py) | [Adapter](head/model/imitation/wayformer/adapter.py) | [config.yaml](head/model/imitation/wayformer/config.yaml) |
 
    Both use the same [closed-loop inference entry](head/policy/imitation_policy/closed_loop_inference.py),
    controller and evaluation. Model adapters implement the input/output contract
-   in [base.py](head/model/base.py).
+   in [base.py](head/model/imitation/base.py).
+
+   New imitation models provide `head/model/imitation/<name>/adapter.py:Adapter`
+   and `config.yaml`. New strategy families provide `head/model/<family>/adapter.py:Adapter`
+   implementing [BasePolicyAdapter](head/model/base.py), plus their `workflow.policies.<family>`
+   configuration. Family adapters select a simulator policy and execution path;
+   model adapters produce trajectories. Existing controllers and evaluation are shared where applicable.
 
    **Pluto input:** route estimation uses the full logged ego path, including
    future positions; this is not strictly history-only evaluation.
@@ -255,7 +263,7 @@ an X11-capable display are recommended. A GPU is optional for basic usage.
 
    Pluto executes the network's top-1 trajectory by default
    (`trajectory_selection_mode: neural_only` in
-   `head/model/pluto/config.yaml`); the rule-based
+   `head/model/imitation/pluto/config.yaml`); the rule-based
    evaluator is not constructed at all. Set it to `hybrid` to re-score
    candidates with the rule-based evaluator instead. WayFormer selects the
    highest network-probability mode, not the first output mode. The episode
@@ -375,7 +383,7 @@ Li, Quanyi and Peng, Zhenghao and Feng, Lan and Zhang, Qihang and Xue, Zhenghai 
 ## License
 
 The HEAD root [LICENSE](./LICENSE) is MIT. Integrated model code retains its
-[upstream terms](head/model/common/LICENSE) and [AGPLv3 license](head/model/common/LICENSE.AGPL).
+[upstream terms](head/model/imitation/common/LICENSE) and [AGPLv3 license](head/model/imitation/common/LICENSE.AGPL).
 Model weights remain subject to their providers' terms.
 
 ## Project Structure
@@ -387,11 +395,15 @@ metrics are kept under `artifacts/` and are not source files.
 ```text
 HEAD/
 ├── head/
-│   ├── model/                   # shared contract + one directory per algorithm
-│   │   ├── base.py / loader.py  # typed I/O and convention-based discovery
-│   │   ├── common/             # shared feature utilities and upstream licenses
-│   │   ├── pluto/              # network, feature builder, config, adapter
-│   │   └── wayformer/          # network, feature builder, config, adapter
+│   ├── model/                   # driving strategy families
+│   │   ├── base.py / loader.py  # family adapters and discovery
+│   │   ├── imitation/          # trajectory models and shared preprocessing
+│   │   │   ├── pluto/
+│   │   │   ├── wayformer/
+│   │   │   └── common/
+│   │   ├── poly/               # polynomial planning and its original controller
+│   │   ├── zero/               # zero-action and direct-control policies
+│   │   └── idm/                # IDM policy integration
 │   ├── configs/                 # default.yaml and per-task YAML files
 │   ├── envs/                    # generated and recorded MetaDrive environments
 │   ├── evolution_engine/        # environment builder and RLBoost/SAC
@@ -402,8 +414,8 @@ HEAD/
 │   │   ├── closed_loop_metrics.py  # MetaDrive events + evaluation delegation
 │   │   └── evaluation_v2.py     # adapter into the evaluation package
 │   ├── policy/
-│   │   ├── basic_policy/        # IDM and Zero
-│   │   ├── evolvable_policy/    # Poly and local planner
+│   │   ├── basic_policy/        # traffic-policy utilities
+│   │   ├── evolvable_policy/    # legacy Poly import compatibility
 │   │   └── imitation_policy/    # one inference entry + shared controller
 │   ├── renderer/
 │   └── scripts/main_head.py     # closed-loop entry point

@@ -5,7 +5,7 @@ Description: Map related utility functions for processing polylines and map data
 """
 
 import numpy as np
-from head.model.common import common_utils
+from head.model.imitation.common import common_utils
 
 
 def get_map_data(config, center_objects, map_infos):

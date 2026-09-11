@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 from omegaconf import OmegaConf
 
-from head.model import ModelInput, create_adapter
+from head.model.imitation import ModelInput, create_adapter
 
 
 @pytest.mark.parametrize("model", ["pluto", "wayformer"])

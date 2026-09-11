@@ -28,5 +28,8 @@ head = [
     "model/**/LICENSE*",
     "model/**/*.md",
     "configs/tasks/*.yaml",
-    "policy/evolvable_policy/common/cfgs/*.yaml"
+    "model/poly/common/local_planner/*.cpp",
+    "model/poly/common/local_planner/*.pyx",
+    "model/poly/common/local_planner/CMakeLists.txt",
+    "model/poly/common/local_planner/compile_command.txt"
 ]

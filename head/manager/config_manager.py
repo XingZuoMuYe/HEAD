@@ -21,7 +21,8 @@ VALID_TASKS = {
     "single_scenario-v0",
     "real_scenario-v0",
 }
-VALID_BASE_POLICIES = {"IDM", "imitation", "Poly", "Zero"}
+# Backward-compatible workflow.type aliases, not a strategy registry.
+LEGACY_DEPLOY_ALIASES = {"IDM", "imitation", "Poly", "Zero"}
 VALID_WORKFLOWS = {"deploy", "evolution"}
 VALID_EVOLUTION_STRATEGIES = {("RLBoost", "SAC")}
 
@@ -79,7 +80,7 @@ def validate_config(args):
     # Accept direct policy names as a concise deploy alias, e.g.
     # ``workflow.type=imitation``. The canonical representation remains
     # ``type=deploy`` plus ``policy=imitation``.
-    if workflow.type in VALID_BASE_POLICIES:
+    if workflow.type in LEGACY_DEPLOY_ALIASES:
         workflow.policy = workflow.type
         workflow.type = "deploy"
     if workflow.type == "evo":
@@ -109,8 +110,8 @@ def validate_config(args):
         workflow.policy = policy
     if policy is None:
         raise ValueError("workflow.policy is required (IDM, Poly, Zero, or imitation)")
-    if policy not in VALID_BASE_POLICIES:
-        raise ValueError(f"Unknown workflow.policy '{policy}'")
+    from head.model import get_policy_adapter
+    adapter_class = get_policy_adapter(policy)
     policies = getattr(workflow, "policies", None)
     if policies is None or not hasattr(policies, policy):
         raise ValueError(f"workflow.policies.{policy} configuration is required")
@@ -118,24 +119,7 @@ def validate_config(args):
     checkpoint = selected.get("checkpoint", None)
     if checkpoint is not None and not isinstance(checkpoint, str):
         raise ValueError(f"workflow.policies.{policy}.checkpoint must be a path or null")
-    if checkpoint == "auto" and policy != "Poly":
-        raise ValueError(f"workflow.policies.{policy}.checkpoint=auto is only valid for Poly")
-    if policy == "imitation":
-        imitation = selected
-        if args.task != "real_scenario-v0" or not args.scenario.capabilities.closed_loop_imitation:
-            raise ValueError(
-                "workflow.policy=imitation is only supported by real_scenario-v0 "
-                "with scenario.capabilities.closed_loop_imitation=true"
-            )
-        model = imitation.get("model")
-        from head.model import get_adapter_class
-        get_adapter_class(model)  # Lazy discovery, no per-model allow-list.
-        if not imitation.get("checkpoint"):
-            raise ValueError("workflow.policies.imitation.checkpoint is required")
-        if int(imitation.get("warmup_steps", 0)) < 0:
-            raise ValueError("workflow.policies.imitation.warmup_steps must be non-negative")
-        if int(imitation.get("replan_frequency", 1)) < 1:
-            raise ValueError("workflow.policies.imitation.replan_frequency must be at least 1")
+    adapter_class.validate(args, selected)
     if workflow.type == "evolution":
         strategy = (workflow.evolution.strategy, workflow.evolution.learner)
         if strategy not in VALID_EVOLUTION_STRATEGIES:

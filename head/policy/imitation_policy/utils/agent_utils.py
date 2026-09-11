@@ -6,8 +6,8 @@ Description: Agent related utility functions for processing agent data.
 
 import numpy as np
 from collections import defaultdict
-from head.model.common import common_utils
-from head.model.common.my_types import object_type
+from head.model.imitation.common import common_utils
+from head.model.imitation.common.my_types import object_type
 
 default_value = 0
 object_type = defaultdict(lambda: default_value, object_type)

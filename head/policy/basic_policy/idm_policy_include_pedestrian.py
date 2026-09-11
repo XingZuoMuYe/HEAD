@@ -9,7 +9,7 @@ from metadrive.utils.math import not_zero, wrap_to_pi, norm
 # ====== C++ 加速 StraightLane.position / get_polyline ======
 # try:
 #     # 1) 载入你编译好的 pybind11 扩展（路径按你的工程来；若不同请改成你的模块路径）
-#     from head.policy.evolvable_policy.common.local_planner import local_utils_cpp as _cu
+#     from head.model.poly.common.local_planner import local_utils_cpp as _cu
 #     # 2) 引入库内 StraightLane 类
 #     from metadrive.component.lane.straight_lane import StraightLane
 #

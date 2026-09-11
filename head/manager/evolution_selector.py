@@ -9,7 +9,7 @@ from pathlib import Path
 
 from head.evolution_engine.RLBoost.SAC.SAC_learner import SAC_Learner, SACConfig
 from head.evolution_engine.env_builder.env import make_env
-from head.manager.artifact_paths import has_poly_checkpoint
+from head.model import resolve_policy_binding
 from head.manager.closed_loop_metrics import ClosedLoopMetricsRecorder
 import torch
 
@@ -156,7 +156,7 @@ class NoEvolutionStrategy:
 class ImitationStrategy(NoEvolutionStrategy):
     """
     模仿学习策略类,用于加载和运行模仿学习模型。
-    模型专用处理由 head.model 下的适配器负责，公共流程无需判断模型名称。
+    模型专用处理由 head.model.imitation 下的适配器负责，公共流程无需判断模型名称。
     """
 
     def __init__(self, cfg):
@@ -248,52 +248,16 @@ class ImitationStrategy(NoEvolutionStrategy):
         return None
 
 def resolve_evolution_strategy(cfg):
-    """
-    根据配置选择对应的策略类。
-    - deploy + IDM/Zero: NoEvolutionStrategy
-    - deploy + imitation: ImitationStrategy
-    - deploy + Poly: evolution learner in evaluation mode when a checkpoint exists
-    - evolution + any policy: configured evolution learner
-    """
-    mode = cfg.args.workflow.type
-    if mode == "evo":
-        mode = "evolution"
-    
-    # 部署模式
-    if mode == "deploy":
-        policy = cfg.args.workflow.policy
-        
-        if policy == 'IDM':
-            print("[信息] 检测到部署模式,基础策略为:IDM,不使用进化策略")
-            return NoEvolutionStrategy
-        elif policy == 'imitation':
-            print("[信息] 检测到imitation基础策略,使用模仿学习策略")
-            return ImitationStrategy
-        elif policy == 'Poly':
-            if not has_poly_checkpoint(cfg.args):
-                print("[信息] deploy + Poly 未找到权重，使用随机 action_space.sample()")
-                return NoEvolutionStrategy
-            print("[信息] 检测到部署模式,基础策略为:Poly,需要加载进化权重")
-        elif policy == 'Zero':
-            print("[信息] 检测到部署模式,基础策略为:Zero,不使用进化策略")
-            return NoEvolutionStrategy
-        else:
-            raise ValueError(f"未知的部署策略 '{policy}'")
-    
-    # 进化模式 或 需要进化的部署模式
-    if mode == "evolution" or mode == "deploy":
-        sel_cfg = cfg.args.workflow.evolution
-        main = sel_cfg.strategy
-        sub = sel_cfg.learner
-
-        # 映射表检查
-        if main not in EVOLUTION_STRATEGY_MAPPING or sub not in EVOLUTION_STRATEGY_MAPPING[main]:
-            raise ValueError(f"策略 '{main}/{sub}' 尚未实现,请检查配置或扩展映射表。")
-
-        # 返回策略类
-        StrategyClass = EVOLUTION_STRATEGY_MAPPING[main][sub]
-        print(f"[信息] 已选择进化策略:{main}/{sub}")
-        return StrategyClass
-    
-    else:
-        raise ValueError(f"无效的 workflow.type '{mode}',必须是 'evolution' 或 'deploy'")
+    """Choose an execution path from the family binding, not the algorithm name."""
+    binding = resolve_policy_binding(cfg)
+    if binding.runner == "policy":
+        return NoEvolutionStrategy
+    if binding.runner == "imitation":
+        return ImitationStrategy
+    selected = cfg.args.workflow.evolution
+    main, sub = selected.strategy, selected.learner
+    strategy_class = EVOLUTION_STRATEGY_MAPPING.get(main, {}).get(sub)
+    if strategy_class is None:
+        raise ValueError(f"策略 '{main}/{sub}' 尚未实现,请检查配置或扩展映射表。")
+    print(f"[信息] 已选择进化策略:{main}/{sub}")
+    return strategy_class

@@ -5,7 +5,7 @@ from metadrive.utils.draw_top_down_map import draw_top_down_map
 from stable_baselines3.common.monitor import Monitor
 from head.envs.config_traffic_metadrive_env import StraightConfTraffic
 from head.renderer.head_renderer import HeadTopDownRenderer
-from head.policy.evolvable_policy.poly_planning_policy import RLPlanningPolicy
+from head.model.poly.policy import RLPlanningPolicy
 from metadrive.policy.env_input_policy import EnvInputPolicy
 from metadrive.component.map.base_map import BaseMap
 from metadrive.component.map.pg_map import parse_map_config, MapGenerateMethod
@@ -140,4 +140,3 @@ if __name__ == "__main__":
             if truncate or terminate:
                 env.reset()
                 break
-

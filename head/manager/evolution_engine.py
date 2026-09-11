@@ -1,4 +1,4 @@
-from head.policy.evolvable_policy.poly_planning_policy import RLPlanningPolicy
+from head.model.poly.policy import RLPlanningPolicy
 from metadrive.policy.env_input_policy import EnvInputPolicy
 from metadrive.policy.idm_policy import IDMPolicy
 

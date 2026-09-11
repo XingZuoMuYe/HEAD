@@ -1,6 +1,6 @@
 """Single model-independent closed-loop inference entry point."""
 import numpy as np
-from head.model import ModelInput, Trajectory, create_adapter
+from head.model.imitation import ModelInput, Trajectory, create_adapter
 
 
 class ClosedLoopInference:
@@ -12,7 +12,7 @@ class ClosedLoopInference:
     def predict(self, scenario, current_step):
         trajectory = self.adapter.compute_trajectory(ModelInput(scenario, int(current_step)))
         if not isinstance(trajectory, Trajectory):
-            raise TypeError("Adapter.compute_trajectory must return head.model.Trajectory")
+            raise TypeError("Adapter.compute_trajectory must return head.model.imitation.Trajectory")
         if not np.isclose(trajectory.dt, self.controller_dt, rtol=0, atol=1e-8):
             raise ValueError("Adapter trajectory dt must match controller dt; resample in the adapter")
         self.trajectory = trajectory
